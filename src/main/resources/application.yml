@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+stamping:
+  temp-dir: ${java.io.tmpdir}/pdf-stamping
+  default-font-size: 14
+  default-font-color: "#000000"
+  default-opacity: 1.0
+
+logging:
+  level:
+    com.stamping: INFO
+    org.apache.pdfbox: WARN
