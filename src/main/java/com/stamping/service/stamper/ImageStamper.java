@@ -1,16 +1,21 @@
 package com.stamping.service.stamper;
 
+import com.itextpdf.io.image.ImageData;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.kernel.geom.AffineTransform;
+import com.itextpdf.kernel.geom.Rectangle;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
+import com.itextpdf.kernel.pdf.PdfReader;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.kernel.pdf.extgstate.PdfExtGState;
 import com.stamping.exception.StampingException;
 import com.stamping.model.StampPosition;
 import com.stamping.model.StampRequest;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
-import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Set;
 
@@ -23,79 +28,85 @@ public class ImageStamper implements Stamper {
             throw new StampingException("Image content is required for IMAGE stamp type");
         }
 
-        try (PDDocument document = PDDocument.load(pdfBytes)) {
-            Set<Integer> targetPages = PageSelector.parsePages(request.getPages(), document.getNumberOfPages());
-            PDImageXObject image = PDImageXObject.createFromByteArray(document, stampContent, "stamp");
+        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+            PdfDocument pdfDoc = new PdfDocument(
+                    new PdfReader(new ByteArrayInputStream(pdfBytes)),
+                    new PdfWriter(os));
 
-            float scale = request.getScale();
-            float imgWidth = image.getWidth() * scale;
-            float imgHeight = image.getHeight() * scale;
+            Set<Integer> targetPages = PageSelector.parsePages(request.getPages(), pdfDoc.getNumberOfPages());
 
-            for (int pageIndex = 0; pageIndex < document.getNumberOfPages(); pageIndex++) {
-                if (!targetPages.contains(pageIndex))
+            // Create ImageData from bytes
+            ImageData imageData = ImageDataFactory.create(stampContent);
+
+            float scale = request.getScale() > 0 ? request.getScale() : 1.0f;
+            float imgWidth = imageData.getWidth() * scale;
+            float imgHeight = imageData.getHeight() * scale;
+
+            for (int pageIndex = 1; pageIndex <= pdfDoc.getNumberOfPages(); pageIndex++) {
+                if (!targetPages.contains(pageIndex - 1)) {
                     continue;
-
-                PDPage page = document.getPage(pageIndex);
-                PDRectangle mediaBox = page.getMediaBox();
-
-                float[] pos = calculatePosition(request, mediaBox, imgWidth, imgHeight);
-
-                try (PDPageContentStream cs = new PDPageContentStream(
-                        document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
-
-                    // Set opacity
-                    if (request.getOpacity() < 1.0f) {
-                        PDExtendedGraphicsState gs = new PDExtendedGraphicsState();
-                        gs.setNonStrokingAlphaConstant(request.getOpacity());
-                        gs.setStrokingAlphaConstant(request.getOpacity());
-                        cs.setGraphicsStateParameters(gs);
-                    }
-
-                    // Apply rotation if needed
-                    if (request.getRotation() != 0) {
-                        cs.saveGraphicsState();
-                        float centerX = pos[0] + imgWidth / 2;
-                        float centerY = pos[1] + imgHeight / 2;
-                        double radians = Math.toRadians(request.getRotation());
-                        float cos = (float) Math.cos(radians);
-                        float sin = (float) Math.sin(radians);
-
-                        // Translate to center, rotate, translate back
-                        cs.transform(org.apache.pdfbox.util.Matrix.getTranslateInstance(centerX, centerY));
-                        cs.transform(org.apache.pdfbox.util.Matrix.getRotateInstance(radians, 0, 0));
-                        cs.transform(org.apache.pdfbox.util.Matrix.getTranslateInstance(-imgWidth / 2, -imgHeight / 2));
-                        cs.drawImage(image, 0, 0, imgWidth, imgHeight);
-                        cs.restoreGraphicsState();
-                    } else {
-                        cs.drawImage(image, pos[0], pos[1], imgWidth, imgHeight);
-                    }
                 }
+
+                PdfPage page = pdfDoc.getPage(pageIndex);
+                Rectangle pageSize = page.getPageSize();
+                PdfCanvas pdfCanvas = new PdfCanvas(page);
+
+                // Calculate position
+                float[] pos = calculatePosition(request, pageSize, imgWidth, imgHeight);
+
+                pdfCanvas.saveState();
+
+                // Apply opacity
+                if (request.getOpacity() < 1.0f) {
+                    PdfExtGState gs = new PdfExtGState();
+                    gs.setFillOpacity(request.getOpacity());
+                    gs.setStrokeOpacity(request.getOpacity());
+                    pdfCanvas.setExtGState(gs);
+                }
+
+                float x = pos[0];
+                float y = pos[1];
+                float origW = imageData.getWidth();
+                float origH = imageData.getHeight();
+
+                AffineTransform transform = new AffineTransform();
+                transform.translate(x, y);
+                transform.scale(scale, scale);
+
+                if (request.getRotation() != 0) {
+                    transform.rotate(Math.toRadians(request.getRotation()), origW / 2, origH / 2);
+                }
+
+                pdfCanvas.concatMatrix(transform);
+                // Draw at native size (0,0 to origW, origH) - transform handles scaling and
+                // position
+                pdfCanvas.addImageAt(imageData, 0f, 0f, false);
+
+                pdfCanvas.restoreState();
             }
 
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            document.save(out);
-            return out.toByteArray();
+            pdfDoc.close();
+            return os.toByteArray();
 
-        } catch (StampingException e) {
-            throw e;
         } catch (Exception e) {
             throw new StampingException("Failed to apply image stamp: " + e.getMessage(), e);
         }
     }
 
-    private float[] calculatePosition(StampRequest request, PDRectangle mediaBox,
-            float contentWidth, float contentHeight) {
+    private float[] calculatePosition(StampRequest request, Rectangle pageSize, float contentWidth,
+            float contentHeight) {
         float margin = 20f;
         StampPosition position = request.getPosition() != null ? request.getPosition() : StampPosition.CENTER;
 
+        float pageW = pageSize.getWidth();
+        float pageH = pageSize.getHeight();
+
         return switch (position) {
-            case TOP_LEFT -> new float[] { margin, mediaBox.getHeight() - margin - contentHeight };
-            case TOP_RIGHT -> new float[] { mediaBox.getWidth() - margin - contentWidth,
-                    mediaBox.getHeight() - margin - contentHeight };
+            case TOP_LEFT -> new float[] { margin, pageH - margin - contentHeight };
+            case TOP_RIGHT -> new float[] { pageW - margin - contentWidth, pageH - margin - contentHeight };
             case BOTTOM_LEFT -> new float[] { margin, margin };
-            case BOTTOM_RIGHT -> new float[] { mediaBox.getWidth() - margin - contentWidth, margin };
-            case CENTER -> new float[] { (mediaBox.getWidth() - contentWidth) / 2,
-                    (mediaBox.getHeight() - contentHeight) / 2 };
+            case BOTTOM_RIGHT -> new float[] { pageW - margin - contentWidth, margin };
+            case CENTER -> new float[] { (pageW - contentWidth) / 2, (pageH - contentHeight) / 2 };
             case CUSTOM -> new float[] {
                     request.getX() != null ? request.getX() : 0f,
                     request.getY() != null ? request.getY() : 0f };

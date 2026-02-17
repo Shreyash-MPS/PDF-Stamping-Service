@@ -1,19 +1,30 @@
 package com.stamping.service.stamper;
 
+import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.kernel.colors.DeviceRgb;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.geom.Rectangle;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
+import com.itextpdf.kernel.pdf.PdfReader;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.kernel.pdf.extgstate.PdfExtGState;
+import com.itextpdf.layout.Canvas;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.layout.LayoutArea;
+import com.itextpdf.layout.layout.LayoutContext;
+import com.itextpdf.layout.layout.LayoutResult;
+import com.itextpdf.layout.renderer.IRenderer;
 import com.stamping.exception.StampingException;
 import com.stamping.model.StampPosition;
 import com.stamping.model.StampRequest;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.util.List;
+import java.io.IOException;
 import java.util.Set;
 
 @Component("textStamper")
@@ -25,160 +36,129 @@ public class TextStamper implements Stamper {
             throw new StampingException("Text content is required for TEXT stamp type");
         }
 
-        try (PDDocument document = PDDocument.load(pdfBytes)) {
-            Set<Integer> targetPages = PageSelector.parsePages(request.getPages(), document.getNumberOfPages());
-            PDType1Font font = PDType1Font.HELVETICA_BOLD;
+        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+            PdfDocument pdfDoc = new PdfDocument(
+                    new PdfReader(new ByteArrayInputStream(pdfBytes)),
+                    new PdfWriter(os));
+
+            Set<Integer> targetPages = PageSelector.parsePages(request.getPages(), pdfDoc.getNumberOfPages());
+            PdfFont font = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             float fontSize = request.getFontSize();
-            java.awt.Color color = parseColor(request.getFontColor());
+            DeviceRgb color = parseColor(request.getFontColor());
 
-            for (int pageIndex = 0; pageIndex < document.getNumberOfPages(); pageIndex++) {
-                if (!targetPages.contains(pageIndex))
+            for (int pageIndex = 1; pageIndex <= pdfDoc.getNumberOfPages(); pageIndex++) {
+                if (!targetPages.contains(pageIndex - 1)) {
                     continue;
+                }
 
-                PDPage page = document.getPage(pageIndex);
-                PDRectangle mediaBox = page.getMediaBox();
+                PdfPage page = pdfDoc.getPage(pageIndex);
+                Rectangle pageSize = page.getPageSize();
+                PdfCanvas pdfCanvas = new PdfCanvas(page);
 
-                // Calculate text wrapping
+                // Create paragraph
+                Paragraph p = new Paragraph(request.getText())
+                        .setFont(font)
+                        .setFontSize(fontSize)
+                        .setFontColor(color);
+
+                // Determine maximum width
                 float maxWidth = request.getStampWidth() != null
                         ? request.getStampWidth()
-                        : mediaBox.getWidth() - 40f; // Default margin consideration
+                        : pageSize.getWidth() - 40f;
 
-                List<String> lines = wrapText(request.getText(), font, fontSize, maxWidth);
+                // Measure content
+                float contentHeight = measureParagraphHeight(p, maxWidth, pdfCanvas, pageSize);
 
-                // Calculate dimensions
-                float maxLineWidth = 0;
-                for (String line : lines) {
-                    maxLineWidth = Math.max(maxLineWidth, font.getStringWidth(line) / 1000 * fontSize);
+                // Calculate position
+                float[] pos = calculatePosition(request, pageSize, maxWidth, contentHeight);
+                float x = pos[0];
+                float y = pos[1];
+
+                // Render
+                pdfCanvas.saveState();
+
+                // Apply opacity
+                if (request.getOpacity() < 1.0f) {
+                    PdfExtGState gs = new PdfExtGState();
+                    gs.setFillOpacity(request.getOpacity());
+                    gs.setStrokeOpacity(request.getOpacity());
+                    pdfCanvas.setExtGState(gs);
                 }
-                float leading = 1.2f * fontSize;
-                float textHeight = lines.size() * leading; // Approximate height
 
-                // Calculate position (bottom-left of the text block)
-                float[] pos = calculatePosition(request, mediaBox, maxLineWidth, textHeight);
-
-                try (PDPageContentStream cs = new PDPageContentStream(
-                        document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
-
-                    // Set opacity
-                    if (request.getOpacity() < 1.0f) {
-                        PDExtendedGraphicsState gs = new PDExtendedGraphicsState();
-                        gs.setNonStrokingAlphaConstant(request.getOpacity());
-                        gs.setStrokingAlphaConstant(request.getOpacity());
-                        cs.setGraphicsStateParameters(gs);
-                    }
-
-                    cs.beginText();
-                    cs.setFont(font, fontSize);
-                    cs.setNonStrokingColor(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
-                    cs.setLeading(leading);
-
-                    // Apply rotation if needed
-                    // We calculate the center of the text block for rotation
-                    float centerX = pos[0] + maxLineWidth / 2;
-                    float centerY = pos[1] + textHeight / 2;
-
-                    // Start position for the FIRST line (top-left of text block, adjusted for
-                    // baseline)
-                    // pos[1] is bottom y. Top y is pos[1] + textHeight.
-                    // First line baseline is roughly top y - fontSize (or simply handled by moving
-                    // to top and usingnewLine)
-
-                    // Actually, simpler approach:
-                    // matrix translate to (pos[0], pos[1] + textHeight - leading) -> Top line
-                    // baseline
-                    // Then showText, newLine...
-
-                    float startX = pos[0];
-                    float startY = pos[1] + textHeight - leading; // Move to top line baseline
-
-                    // Adjust centering for each line if needed?
-                    // Current request is just wrapping, let's assume left alignment within the
-                    // block for now due to complexity
-                    // or center alignment if Position is CENTER?
-                    // The block is positioned. Text inside the block: let's left align for now.
-
-                    if (request.getRotation() != 0) {
-                        double radians = Math.toRadians(request.getRotation());
-                        cs.setTextMatrix(org.apache.pdfbox.util.Matrix.getRotateInstance(radians, centerX, centerY));
-                        // After rotating around center, we need to offset to the start of the text
-                        // relative to center
-                        // Relative start: -width/2, +height/2 - leading
-                        cs.newLineAtOffset(-maxLineWidth / 2, textHeight / 2 - leading);
-                    } else {
-                        cs.newLineAtOffset(startX, startY);
-                    }
-
-                    for (String line : lines) {
-                        cs.showText(line);
-                        cs.newLine();
-                    }
-
-                    cs.endText();
+                // Handle rotation
+                if (request.getRotation() != 0) {
+                    double radians = Math.toRadians(request.getRotation());
+                    // Rotate around center of the text block
+                    float cx = x + maxWidth / 2;
+                    float cy = y + contentHeight / 2;
+                    pdfCanvas.concatMatrix(
+                            Math.cos(radians), Math.sin(radians),
+                            -Math.sin(radians), Math.cos(radians),
+                            cx - (cx * Math.cos(radians) - cy * Math.sin(radians)),
+                            cy - (cx * Math.sin(radians) + cy * Math.cos(radians)));
                 }
+
+                // Draw text in the calculated box
+                // Note: The box's x,y is the bottom-left corner.
+                Rectangle finalBox = new Rectangle(x, y, maxWidth, contentHeight);
+                Canvas canvas = new Canvas(pdfCanvas, finalBox);
+                canvas.add(p);
+                canvas.close();
+
+                pdfCanvas.restoreState();
             }
 
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            document.save(out);
-            return out.toByteArray();
+            pdfDoc.close();
+            return os.toByteArray();
 
-        } catch (StampingException e) {
-            throw e;
+        } catch (IOException e) {
+            throw new StampingException("Failed to decode font or read PDF", e);
         } catch (Exception e) {
             throw new StampingException("Failed to apply text stamp: " + e.getMessage(), e);
         }
     }
 
-    private java.util.List<String> wrapText(String text, PDType1Font font, float fontSize, float maxWidth)
-            throws java.io.IOException {
-        java.util.List<String> lines = new java.util.ArrayList<>();
-        String[] words = text.split(" ");
-        StringBuilder currentLine = new StringBuilder();
-
-        for (String word : words) {
-            if (currentLine.length() > 0) {
-                // Check if adding space + word exceeds width
-                String potential = currentLine + " " + word;
-                float width = font.getStringWidth(potential) / 1000 * fontSize;
-                if (width > maxWidth) {
-                    lines.add(currentLine.toString());
-                    currentLine = new StringBuilder(word);
-                } else {
-                    currentLine.append(" ").append(word);
-                }
-            } else {
-                currentLine.append(word);
-            }
+    private float measureParagraphHeight(Paragraph p, float width, PdfCanvas pdfCanvas, Rectangle pageSize) {
+        // Create a dummy container to measure the paragraph
+        // We use a large height to allow full wrapping
+        Rectangle layoutBox = new Rectangle(0, 0, width, pageSize.getHeight());
+        try (Canvas dummyCanvas = new Canvas(pdfCanvas, layoutBox)) {
+            IRenderer renderer = p.createRendererSubTree().setParent(dummyCanvas.getRenderer());
+            LayoutResult result = renderer.layout(new LayoutContext(new LayoutArea(1, layoutBox)));
+            return result.getOccupiedArea().getBBox().getHeight();
         }
-        if (currentLine.length() > 0) {
-            lines.add(currentLine.toString());
-        }
-        return lines;
     }
 
-    private float[] calculatePosition(StampRequest request, PDRectangle mediaBox,
-            float contentWidth, float contentHeight) {
+    private float[] calculatePosition(StampRequest request, Rectangle pageSize, float contentWidth,
+            float contentHeight) {
         float margin = 20f;
         StampPosition position = request.getPosition() != null ? request.getPosition() : StampPosition.CENTER;
 
+        float pageW = pageSize.getWidth();
+        float pageH = pageSize.getHeight();
+
         return switch (position) {
-            case TOP_LEFT -> new float[] { margin, mediaBox.getHeight() - margin - contentHeight };
-            case TOP_RIGHT -> new float[] { mediaBox.getWidth() - margin - contentWidth,
-                    mediaBox.getHeight() - margin - contentHeight };
+            case TOP_LEFT -> new float[] { margin, pageH - margin - contentHeight };
+            case TOP_RIGHT -> new float[] { pageW - margin - contentWidth, pageH - margin - contentHeight };
             case BOTTOM_LEFT -> new float[] { margin, margin };
-            case BOTTOM_RIGHT -> new float[] { mediaBox.getWidth() - margin - contentWidth, margin };
-            case CENTER -> new float[] { (mediaBox.getWidth() - contentWidth) / 2,
-                    (mediaBox.getHeight() - contentHeight) / 2 };
+            case BOTTOM_RIGHT -> new float[] { pageW - margin - contentWidth, margin };
+            case CENTER -> new float[] { (pageW - contentWidth) / 2, (pageH - contentHeight) / 2 };
             case CUSTOM -> new float[] {
                     request.getX() != null ? request.getX() : 0f,
                     request.getY() != null ? request.getY() : 0f };
         };
     }
 
-    private java.awt.Color parseColor(String hex) {
+    private DeviceRgb parseColor(String hex) {
         if (hex == null || hex.isBlank()) {
-            return java.awt.Color.BLACK;
+            return new DeviceRgb(0, 0, 0); // Black
         }
         hex = hex.startsWith("#") ? hex.substring(1) : hex;
-        return new java.awt.Color(Integer.parseInt(hex, 16));
+        try {
+            int rgb = Integer.parseInt(hex, 16);
+            return new DeviceRgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+        } catch (NumberFormatException e) {
+            return new DeviceRgb(0, 0, 0);
+        }
     }
 }
