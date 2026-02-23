@@ -6,6 +6,10 @@ import com.stamping.model.StampPosition;
 import com.stamping.model.StampRequest;
 import com.stamping.model.StampResponse;
 import com.stamping.model.StampType;
+import com.stamping.model.AdJsonRequest;
+import com.stamping.model.MetadataFrontPageRequest;
+import com.stamping.service.AdStampService;
+import com.stamping.service.MetadataFrontPageService;
 import com.stamping.service.StampService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +30,8 @@ import java.nio.file.Paths;
 public class StampController {
 
     private final StampService stampService;
+    private final AdStampService adStampService;
+    private final MetadataFrontPageService metadataFrontPageService;
 
     /**
      * Stamp a PDF with text, image, or HTML content.
@@ -216,6 +222,139 @@ public class StampController {
                     .message("Failed to process stamp request: " + e.getMessage())
                     .build();
             return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Note: The /stamp/ad endpoint functionality has been migrated to
+    // /stamp/adJson.
+    // Preserving the method signature below as deprecated or removing entirely
+    // based on usage.
+    // Removed to favor the unified AdStampService pipeline.
+
+    /**
+     * Stamp a PDF with an ad fetched from a JSON URL.
+     * Maps ads based on JSON positionName configurations ("header" or "pdf ad
+     * one").
+     * Reads the source file from disk.
+     *
+     * @param request the JSON request containing input path and ad configuration
+     * @return the stamped/prepended PDF file (or a JSON response if outputPath is
+     *         provided)
+     */
+    @PostMapping(value = "/stamp/adJson", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> stampPdfWithAdJson(@RequestBody AdJsonRequest request) {
+        try {
+            log.info("Received adJson stamp request: inputPath={}, url={}, adType={}",
+                    request.getInputPath(), request.getAdJsonUrl(), request.getAdType());
+
+            if (request.getInputPath() == null || request.getInputPath().isBlank()) {
+                throw new StampingException("Input file path is required");
+            }
+            if (request.getAdJsonUrl() == null || request.getAdJsonUrl().isBlank()) {
+                throw new StampingException("Ad JSON URL is required");
+            }
+
+            File inputFile = new File(request.getInputPath());
+            if (!inputFile.exists() || !inputFile.canRead()) {
+                throw new StampingException("Cannot read input file: " + request.getInputPath());
+            }
+
+            byte[] pdfBytes = Files.readAllBytes(Paths.get(request.getInputPath()));
+            String adType = request.getAdType() != null ? request.getAdType() : "all";
+
+            byte[] stampedPdf = adStampService.processAdJson(pdfBytes, request.getAdJsonUrl(), adType);
+
+            if (request.getOutputPath() != null && !request.getOutputPath().isBlank()) {
+                // Ensure output directory exists
+                File outputFile = new File(request.getOutputPath());
+                File outputDir = outputFile.getParentFile();
+                if (outputDir != null && !outputDir.exists()) {
+                    outputDir.mkdirs();
+                }
+                Files.write(Paths.get(request.getOutputPath()), stampedPdf);
+
+                StampResponse response = StampResponse.builder()
+                        .success(true)
+                        .message("PDF stamped successfully")
+                        .outputFilePath(request.getOutputPath())
+                        .fileSizeBytes(stampedPdf.length)
+                        .build();
+                return ResponseEntity.ok(response);
+            } else {
+                String outputFilename = inputFile.getName();
+                outputFilename = buildOutputFilename(outputFilename);
+
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + outputFilename + "\"")
+                        .contentType(MediaType.APPLICATION_PDF)
+                        .contentLength(stampedPdf.length)
+                        .body(stampedPdf);
+            }
+
+        } catch (StampingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StampingException("Failed to process adJson stamp request: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Prepend a metadata front page (logo, journal name, doi, authors, date).
+     * Reads the source file from disk.
+     *
+     * @param request the JSON request containing input path and metadata parameters
+     * @return the prepended PDF file (or a JSON response if outputPath is provided)
+     */
+    @PostMapping(value = "/stamp/metadata-page", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> prependMetadataPage(@RequestBody MetadataFrontPageRequest request) {
+        try {
+            log.info("Received metadata-page request: inputPath={}, title={}",
+                    request.getInputPath(), request.getArticleTitle());
+
+            if (request.getInputPath() == null || request.getInputPath().isBlank()) {
+                throw new StampingException("Input file path is required");
+            }
+
+            File inputFile = new File(request.getInputPath());
+            if (!inputFile.exists() || !inputFile.canRead()) {
+                throw new StampingException("Cannot read input file: " + request.getInputPath());
+            }
+
+            byte[] pdfBytes = Files.readAllBytes(Paths.get(request.getInputPath()));
+
+            byte[] stampedPdf = metadataFrontPageService.prependMetadataPage(pdfBytes, request);
+
+            if (request.getOutputPath() != null && !request.getOutputPath().isBlank()) {
+                // Ensure output directory exists
+                File outputFile = new File(request.getOutputPath());
+                File outputDir = outputFile.getParentFile();
+                if (outputDir != null && !outputDir.exists()) {
+                    outputDir.mkdirs();
+                }
+                Files.write(Paths.get(request.getOutputPath()), stampedPdf);
+
+                StampResponse response = StampResponse.builder()
+                        .success(true)
+                        .message("Metadata page prepended successfully")
+                        .outputFilePath(request.getOutputPath())
+                        .fileSizeBytes(stampedPdf.length)
+                        .build();
+                return ResponseEntity.ok(response);
+            } else {
+                String outputFilename = inputFile.getName();
+                outputFilename = buildOutputFilename(outputFilename);
+
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + outputFilename + "\"")
+                        .contentType(MediaType.APPLICATION_PDF)
+                        .contentLength(stampedPdf.length)
+                        .body(stampedPdf);
+            }
+
+        } catch (StampingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StampingException("Failed to process metadata-page request: " + e.getMessage(), e);
         }
     }
 

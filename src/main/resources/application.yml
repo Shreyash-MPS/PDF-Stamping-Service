@@ -9,9 +9,9 @@ spring:
 
 stamping:
   temp-dir: ${java.io.tmpdir}/pdf-stamping
-  default-font-size: 14
+  default-font-size: 12
   default-font-color: "#000000"
-  default-opacity: 1.0
+  default-opacity: 0.8
 
 logging:
   level:
