@@ -46,7 +46,7 @@ public class HtmlStamper implements Stamper {
             html = ensureHtml(html);
 
             // Step 1: Render HTML to PDF (iText creates native link annotations)
-            byte[] htmlPdfBytes = renderHtmlToPdf(html);
+            byte[] htmlPdfBytes = renderHtmlToPdf(html, request);
 
             // Step 2: Overlay HTML PDF onto source PDF with proper annotation transfer
             return overlayHtmlPdf(pdfBytes, htmlPdfBytes, request);
@@ -58,15 +58,22 @@ public class HtmlStamper implements Stamper {
         }
     }
 
-    /**
-     * Render HTML to PDF using iText 7 pdfHTML.
-     * This creates a PDF with all links as native annotations.
-     */
-    private byte[] renderHtmlToPdf(String html) {
+    private byte[] renderHtmlToPdf(String html, StampRequest request) {
         try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
             ConverterProperties props = new ConverterProperties();
-            HtmlConverter.convertToPdf(html, os, props);
-            return os.toByteArray();
+
+            if (request.getStampWidth() != null && request.getStampHeight() != null) {
+                com.itextpdf.kernel.pdf.PdfWriter writer = new com.itextpdf.kernel.pdf.PdfWriter(os);
+                com.itextpdf.kernel.pdf.PdfDocument pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
+                pdfDoc.setDefaultPageSize(
+                        new com.itextpdf.kernel.geom.PageSize(request.getStampWidth(), request.getStampHeight()));
+                com.itextpdf.layout.Document document = HtmlConverter.convertToDocument(html, pdfDoc, props);
+                document.close();
+                return os.toByteArray();
+            } else {
+                HtmlConverter.convertToPdf(html, os, props);
+                return os.toByteArray();
+            }
         } catch (Exception e) {
             throw new StampingException("Failed to render HTML to PDF: " + e.getMessage(), e);
         }
@@ -288,6 +295,22 @@ public class HtmlStamper implements Stamper {
                     break;
                 case CENTER:
                     x = (pageWidth - stampWidth) / 2;
+                    y = (pageHeight - stampHeight) / 2;
+                    break;
+                case HEADER:
+                    x = (pageWidth - stampWidth) / 2;
+                    y = pageHeight - stampHeight;
+                    break;
+                case FOOTER:
+                    x = (pageWidth - stampWidth) / 2;
+                    y = 0;
+                    break;
+                case LEFT_MARGIN:
+                    x = 0;
+                    y = (pageHeight - stampHeight) / 2;
+                    break;
+                case RIGHT_MARGIN:
+                    x = pageWidth - stampWidth;
                     y = (pageHeight - stampHeight) / 2;
                     break;
                 default:

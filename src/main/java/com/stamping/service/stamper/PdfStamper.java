@@ -146,6 +146,22 @@ public class PdfStamper implements Stamper {
                     x = (pageWidth - stampWidth) / 2;
                     y = (pageHeight - stampHeight) / 2;
                     break;
+                case HEADER:
+                    x = (pageWidth - stampWidth) / 2;
+                    y = pageHeight - margin - stampHeight;
+                    break;
+                case FOOTER:
+                    x = (pageWidth - stampWidth) / 2;
+                    y = margin;
+                    break;
+                case LEFT_MARGIN:
+                    x = margin;
+                    y = (pageHeight - stampHeight) / 2;
+                    break;
+                case RIGHT_MARGIN:
+                    x = pageWidth - margin - stampWidth;
+                    y = (pageHeight - stampHeight) / 2;
+                    break;
                 default:
                     x = 0;
                     y = 0;

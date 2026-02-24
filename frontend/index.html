@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stamping Configuration Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo-wrapper">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+            <h1>Stamping Portal</h1>
+            <p>Configure and map PDF injection strategies dynamically.</p>
+        </header>
+
+        <form id="stampForm">
+            <!-- Source PDF -->
+            <section class="card">
+                <h2><span class="number">0</span> Source Document</h2>
+                <div class="input-group">
+                    <label for="sourcePdf">Upload PDF Document</label>
+                    <input type="file" id="sourcePdf" name="sourcePdf" accept="application/pdf" required
+                        style="padding: 0.5rem; background: rgba(13, 17, 23, 0.5); border: 1px solid var(--border-color); border-radius: 8px; width: 100%; color: var(--text-main);">
+                </div>
+            </section>
+
+            <!-- Global Config -->
+            <section class="card">
+                <h2><span class="number">1</span> Global Settings</h2>
+                <div class="input-group-row">
+                    <div class="input-group">
+                        <label for="publisherId">Publisher ID</label>
+                        <input type="text" id="publisherId" name="publisherId" placeholder="e.g. pub_12345" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="jcode">Jcode</label>
+                        <input type="text" id="jcode" name="jcode" placeholder="e.g. JRNL01" required>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page Strategy Toggle -->
+            <section class="card">
+                <h2><span class="number">2</span> Injection Strategy</h2>
+                <div class="strategy-toggle">
+                    <label class="radio-label">
+                        <input type="radio" name="strategy" value="new_page" checked>
+                        <div class="radio-card">
+                            <div class="icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                                </svg>
+                            </div>
+                            <h3>Add to New Page</h3>
+                            <p>Prepend a fully styled, dynamically generated page to the start of the journal.</p>
+                        </div>
+                    </label>
+
+                    <label class="radio-label">
+                        <input type="radio" name="strategy" value="update_existing">
+                        <div class="radio-card">
+                            <div class="icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </div>
+                            <h3>Update Existing Pages</h3>
+                            <p>Stamp the provided attributes onto the native pages incrementally.</p>
+                        </div>
+                    </label>
+                </div>
+            </section>
+
+            <!-- Positioning -->
+            <section class="card">
+                <h2><span class="number">3</span> Alignment & Format</h2>
+                <div class="input-group">
+                    <label for="position">Stamp Position</label>
+                    <div class="select-wrapper">
+                        <select id="position" name="position" required>
+                            <option value="HEADER">Header</option>
+                            <option value="FOOTER">Footer</option>
+                            <option value="LEFT_MARGIN">Left Margin</option>
+                            <option value="RIGHT_MARGIN">Right Margin</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section Attributes -->
+            <section class="card">
+                <h2><span class="number">4</span> Content & Attributes</h2>
+
+                <!-- Content Strategy Selection -->
+                <div class="checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="addLogo" name="addLogo">
+                        <span class="checkmark"></span>
+                        Add Image Logo
+                    </label>
+                </div>
+                <div class="input-group expanded-field" id="logoUploadWrapper">
+                    <label for="imageUpload">Upload Image</label>
+                    <input type="file" id="imageUpload" name="imageUpload" accept="image/png, image/jpeg, image/jpg">
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="addText" name="addText">
+                        <span class="checkmark"></span>
+                        Add Custom Text
+                    </label>
+                </div>
+                <div class="input-group expanded-field" id="textInputWrapper">
+                    <label for="textContent">Text Content</label>
+                    <textarea id="textContent" name="textContent" rows="2"
+                        placeholder="Enter stamp text here..."></textarea>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="addHtml" name="addHtml">
+                        <span class="checkmark"></span>
+                        Add HTML
+                    </label>
+                </div>
+                <div class="input-group expanded-field" id="htmlInputWrapper">
+                    <label for="htmlContent">HTML Content</label>
+                    <textarea id="htmlContent" name="htmlContent" rows="3"
+                        placeholder="<div>Your HTML here</div>"></textarea>
+                </div>
+
+                <hr style="border: 0; height: 1px; background: rgba(255,255,255,0.1); margin: 1.5rem 0;">
+
+                <div class="checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="addDoi" name="addDoi">
+                        <span class="checkmark"></span>
+                        Include DOI
+                    </label>
+                </div>
+
+                <div class="input-group expanded-field" id="doiFieldWrapper">
+                    <label for="doiValue">DOI Value</label>
+                    <input type="text" id="doiValue" name="doiValue" placeholder="e.g. 10.1234/ajnr.A123">
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="addDate" name="addDate" checked>
+                        <span class="checkmark"></span>
+                        Include Processing Date
+                    </label>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="isAd" name="isAd">
+                        <span class="checkmark"></span>
+                        Add Advertisement
+                    </label>
+                </div>
+
+                <div class="input-group expanded-field" id="adLinkWrapper">
+                    <label for="adLink">Ads Presenter Link</label>
+                    <input type="url" id="adLink" name="adLink" placeholder="https://example.com/click-through">
+                </div>
+
+                <div class="input-group">
+                    <label for="optionalText">Additional Context <span class="badge">Optional</span></label>
+                    <textarea id="optionalText" name="optionalText" rows="3"
+                        placeholder="Enter any extra metadata or disclaimers here..."></textarea>
+                </div>
+            </section>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                <span class="btn-text">Generate Configuration</span>
+                <div class="loader-ring"></div>
+            </button>
+        </form>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span>Configuration generated successfully! Check the console.</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

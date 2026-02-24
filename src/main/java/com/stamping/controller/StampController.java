@@ -1,6 +1,8 @@
 package com.stamping.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stamping.exception.StampingException;
+import com.stamping.model.DynamicStampRequest;
 import com.stamping.model.FilePathStampRequest;
 import com.stamping.model.StampPosition;
 import com.stamping.model.StampRequest;
@@ -8,6 +10,8 @@ import com.stamping.model.StampResponse;
 import com.stamping.model.StampType;
 import com.stamping.model.AdJsonRequest;
 import com.stamping.model.MetadataFrontPageRequest;
+import com.stamping.model.ad.AdResponse;
+import com.stamping.service.AdFetchService;
 import com.stamping.service.AdStampService;
 import com.stamping.service.MetadataFrontPageService;
 import com.stamping.service.StampService;
@@ -25,6 +29,7 @@ import java.nio.file.Paths;
 
 @Slf4j
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class StampController {
@@ -32,6 +37,8 @@ public class StampController {
     private final StampService stampService;
     private final AdStampService adStampService;
     private final MetadataFrontPageService metadataFrontPageService;
+    private final AdFetchService adFetchService;
+    private final ObjectMapper objectMapper;
 
     /**
      * Stamp a PDF with text, image, or HTML content.
@@ -121,6 +128,227 @@ public class StampController {
             throw e;
         } catch (Exception e) {
             throw new StampingException("Failed to process stamp request: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Dynamically stamp a PDF based on the JSON configuration from the frontend.
+     *
+     * @param file      the source PDF file
+     * @param configStr the JSON configuration string
+     * @param imageFile optional image file for logo
+     * @return the stamped PDF file
+     */
+    @PostMapping(value = "/stamp/dynamic", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<byte[]> stampPdfDynamic(
+            @RequestPart("file") MultipartFile file,
+            @RequestPart("config") String configStr,
+            @RequestPart(value = "imageFile", required = false) MultipartFile imageFile) {
+
+        try {
+            log.info("Received dynamic stamp request for file: {}", file.getOriginalFilename());
+
+            if (file.isEmpty()) {
+                throw new StampingException("PDF file is empty");
+            }
+
+            DynamicStampRequest config = objectMapper.readValue(configStr, DynamicStampRequest.class);
+
+            byte[] currentPdfBytes = file.getBytes();
+            DynamicStampRequest.Configuration c = config.getConfiguration();
+
+            // Build dynamic HTML String
+            StringBuilder htmlBuilder = new StringBuilder();
+            htmlBuilder.append("<div style=\"font-family: Arial, sans-serif; text-align: center;\">");
+
+            // 1. Logo
+            if (c.isAddLogo() && imageFile != null && !imageFile.isEmpty()) {
+                byte[] imageBytes = imageFile.getBytes();
+                String base64Image = java.util.Base64.getEncoder().encodeToString(imageBytes);
+                String mimeType = "image/png";
+                String originalFilename = imageFile.getOriginalFilename();
+                if (originalFilename != null
+                        && originalFilename.toLowerCase().endsWith(".jpg")) {
+                    mimeType = "image/jpeg";
+                }
+                htmlBuilder.append("<img src=\"data:").append(mimeType).append(";base64,").append(base64Image)
+                        .append("\" style=\"max-width: 200px; display: block; margin: 0 auto; margin-bottom: 8px;\" />");
+            }
+
+            // 2. Custom Text
+            if (c.isAddText() && c.getTextContent() != null && !c.getTextContent().isBlank()) {
+                htmlBuilder.append("<p style=\"font-size: 14px; margin: 4px 0; font-weight: bold;\">")
+                        .append(c.getTextContent().replace("\n", "<br/>")).append("</p>");
+            }
+
+            // 3. Raw HTML
+            if (c.isAddHtml() && c.getHtmlContent() != null && !c.getHtmlContent().isBlank()) {
+                htmlBuilder.append("<div style=\"margin: 8px 0;\">")
+                        .append(c.getHtmlContent()).append("</div>");
+            }
+
+            // 4. DOI
+            if (c.isAddDoi()) {
+                String expectedDoiUrl = "";
+                if (c.getDoiValue() != null && !c.getDoiValue().isBlank()) {
+                    expectedDoiUrl = c.getDoiValue().startsWith("http") ? c.getDoiValue()
+                            : "https://doi.org/" + c.getDoiValue();
+                } else if (config.getJcode() != null && !config.getJcode().isBlank()) {
+                    expectedDoiUrl = "https://doi.org/" + config.getJcode();
+                }
+
+                if (!expectedDoiUrl.isEmpty()) {
+                    htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: blue;\">doi: ")
+                            .append("<a href=\"").append(expectedDoiUrl)
+                            .append("\" style=\"color: blue; text-decoration: none;\">")
+                            .append(expectedDoiUrl).append("</a></p>");
+                }
+            }
+
+            // 5. Date
+            if (c.isAddDate()) {
+                String dateStr = java.time.LocalDate.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+                htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: #555;\">Date Generated: ")
+                        .append(dateStr).append("</p>");
+            }
+
+            // 6. Ad Embedding
+            if (c.isAd() && c.getAdLink() != null && !c.getAdLink().isBlank()) {
+                // Fetch Ad dynamically to inject into the unified stamp block
+                AdResponse adResponse = adFetchService.fetchAds(c.getAdLink());
+                String extractedAdHtml = null;
+                if (adResponse != null && adResponse.getSection() != null) {
+                    for (var section : adResponse.getSection()) {
+                        if (section.getAdLocation() != null) {
+                            for (var location : section.getAdLocation()) {
+                                if ("header".equalsIgnoreCase(location.getPositionName())
+                                        && location.getAdData() != null) {
+                                    for (var ad : location.getAdData()) {
+                                        if (ad.getAdHtml() != null && !ad.getAdHtml().isEmpty()) {
+                                            extractedAdHtml = ad.getAdHtml();
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (extractedAdHtml != null)
+                                    break;
+                            }
+                        }
+                        if (extractedAdHtml != null)
+                            break;
+                    }
+                }
+
+                if (extractedAdHtml != null) {
+                    String baseUrl = "https://hwmaint.genome.cshlp.org/adsystem/";
+                    extractedAdHtml = extractedAdHtml.replace("src=\"/", "src=\"" + baseUrl)
+                            .replace("href=\"/", "href=\"" + baseUrl);
+                    htmlBuilder.append("<div style=\"margin-top: 10px;\">")
+                            .append(extractedAdHtml).append("</div>");
+                }
+            }
+
+            htmlBuilder.append("</div>");
+            String finalHtml = htmlBuilder.toString();
+
+            // Extract page size unconditionally to ensure generated HTML respects target
+            // margins
+            com.itextpdf.kernel.geom.Rectangle pageSize;
+            try (com.itextpdf.kernel.pdf.PdfDocument tempOriginal = new com.itextpdf.kernel.pdf.PdfDocument(
+                    new com.itextpdf.kernel.pdf.PdfReader(new java.io.ByteArrayInputStream(currentPdfBytes)))) {
+                pageSize = tempOriginal.getPage(1).getPageSize();
+            }
+
+            // Apply based on strategy
+            if ("new_page".equalsIgnoreCase(config.getStrategy())) {
+                // Prepend as a new page
+                String fullHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/></head>" +
+                        "<body style=\"margin: 50px;\">" + finalHtml + "</body></html>";
+
+                byte[] htmlPageBytes = metadataFrontPageService.renderHtmlToPdf(fullHtml, pageSize);
+                currentPdfBytes = metadataFrontPageService.prependPdf(currentPdfBytes, htmlPageBytes);
+
+            } else {
+                // Default unrotated grid parameters
+                float rotation = 0f;
+                float sWidth = pageSize.getWidth();
+                float sHeight = pageSize.getHeight();
+
+                // Map the requested position to CSS alignment rules
+                String posStr = c.getPosition();
+                String hAlign = "center";
+                String vAlign = "middle";
+                String padding = "50px";
+
+                if ("HEADER".equals(posStr) || "FOOTER".equals(posStr) || "CENTER".equals(posStr)) {
+                    padding = "10px";
+                }
+
+                if (posStr.contains("LEFT"))
+                    hAlign = "left";
+                if (posStr.contains("RIGHT"))
+                    hAlign = "right";
+                if (posStr.equals("HEADER") || posStr.contains("TOP"))
+                    vAlign = "top";
+                if (posStr.equals("FOOTER") || posStr.contains("BOTTOM"))
+                    vAlign = "bottom";
+
+                if ("LEFT_MARGIN".equals(posStr)) {
+                    rotation = 90f;
+                    sWidth = pageSize.getHeight();
+                    sHeight = pageSize.getWidth();
+                    // With 90 deg (CCW) rotation, stamp TOP matches page LEFT edge
+                    vAlign = "top";
+                    hAlign = "center";
+                } else if ("RIGHT_MARGIN".equals(posStr)) {
+                    rotation = 270f;
+                    sWidth = pageSize.getHeight();
+                    sHeight = pageSize.getWidth();
+                    // With 270 deg (CW) rotation, stamp TOP matches page RIGHT edge
+                    vAlign = "top";
+                    hAlign = "center";
+                }
+
+                // Create a full-page unmargin'd table overlay to hold the content rigidly in
+                // place
+                String tableHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>html, body { margin: 0; padding: 0; width: 100%; height: 100%; }</style></head><body>"
+                        + "<table style=\"width: 100%; height: 100%; border-collapse: collapse; margin: 0; padding: 0;\">"
+                        + "<tr><td style=\"vertical-align: " + vAlign + "; text-align: " + hAlign + "; padding: "
+                        + padding + ";\">"
+                        + "<div style=\"display: inline-block; background-color: rgba(255,255,255,0.8); padding: 10px; border-radius: 4px; text-align: center;\">"
+                        + finalHtml
+                        + "</div></td></tr></table></body></html>";
+
+                // Update Existing - Use CENTER overlay so that the 90/270 rotated bounds
+                // perfectly sit within the original page boundaries
+                StampRequest htmlReq = StampRequest.builder()
+                        .stampType(StampType.HTML)
+                        .position(StampPosition.CENTER)
+                        .opacity(1.0f)
+                        .rotation(rotation)
+                        .scale(1.0f)
+                        .pages("ALL")
+                        .stampWidth(sWidth)
+                        .stampHeight(sHeight)
+                        .build();
+
+                currentPdfBytes = stampService.applyStamp(currentPdfBytes, htmlReq,
+                        tableHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+
+            String outputFilename = buildOutputFilename(file.getOriginalFilename());
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + outputFilename + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .contentLength(currentPdfBytes.length)
+                    .body(currentPdfBytes);
+
+        } catch (StampingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StampingException("Failed to process dynamic stamp request: " + e.getMessage(), e);
         }
     }
 

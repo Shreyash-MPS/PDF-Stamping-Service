@@ -4,7 +4,7 @@ test_requests/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-.output.pdf
+output.pdf
 
 ### STS ###
 .apt_generated

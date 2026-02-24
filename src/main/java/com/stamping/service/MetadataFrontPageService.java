@@ -128,7 +128,7 @@ public class MetadataFrontPageService {
         return sb.toString();
     }
 
-    private byte[] renderHtmlToPdf(String html, com.itextpdf.kernel.geom.Rectangle pageSize) {
+    public byte[] renderHtmlToPdf(String html, com.itextpdf.kernel.geom.Rectangle pageSize) {
         try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(os);
             PdfDocument pdfDoc = new PdfDocument(writer);
@@ -144,7 +144,7 @@ public class MetadataFrontPageService {
         }
     }
 
-    private byte[] prependPdf(byte[] originalPdfBytes, byte[] appendPdfBytes) {
+    public byte[] prependPdf(byte[] originalPdfBytes, byte[] appendPdfBytes) {
         try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
             PdfDocument resultDoc = new PdfDocument(new PdfWriter(os));
             PdfMerger merger = new PdfMerger(resultDoc);

@@ -107,6 +107,10 @@ public class ImageStamper implements Stamper {
             case BOTTOM_LEFT -> new float[] { margin, margin };
             case BOTTOM_RIGHT -> new float[] { pageW - margin - contentWidth, margin };
             case CENTER -> new float[] { (pageW - contentWidth) / 2, (pageH - contentHeight) / 2 };
+            case HEADER -> new float[] { (pageW - contentWidth) / 2, pageH - margin - contentHeight };
+            case FOOTER -> new float[] { (pageW - contentWidth) / 2, margin };
+            case LEFT_MARGIN -> new float[] { margin, (pageH - contentHeight) / 2 };
+            case RIGHT_MARGIN -> new float[] { pageW - margin - contentWidth, (pageH - contentHeight) / 2 };
             case CUSTOM -> new float[] {
                     request.getX() != null ? request.getX() : 0f,
                     request.getY() != null ? request.getY() : 0f };
