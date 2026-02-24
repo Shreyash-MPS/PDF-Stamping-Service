@@ -273,53 +273,47 @@ public class StampController {
                 float sWidth = pageSize.getWidth();
                 float sHeight = pageSize.getHeight();
 
-                // Map the requested position to CSS alignment rules
                 String posStr = c.getPosition();
-                String hAlign = "center";
-                String vAlign = "middle";
-                String padding = "50px";
+                String cssPosition = "position: absolute; left: 0; right: 0; text-align: center;";
+                String innerAlign = "text-align: center;";
 
-                if ("HEADER".equals(posStr) || "FOOTER".equals(posStr) || "CENTER".equals(posStr)) {
-                    padding = "10px";
-                }
-
-                if (posStr.contains("LEFT"))
-                    hAlign = "left";
-                if (posStr.contains("RIGHT"))
-                    hAlign = "right";
-                if (posStr.equals("HEADER") || posStr.contains("TOP"))
-                    vAlign = "top";
-                if (posStr.equals("FOOTER") || posStr.contains("BOTTOM"))
-                    vAlign = "bottom";
-
-                if ("LEFT_MARGIN".equals(posStr)) {
+                if ("HEADER".equals(posStr) || "TOP_CENTER".equals(posStr) || "TOP".equals(posStr)) {
+                    cssPosition = "position: absolute; top: 10px; left: 0; right: 0; text-align: center;";
+                } else if ("FOOTER".equals(posStr) || "BOTTOM_CENTER".equals(posStr) || "BOTTOM".equals(posStr)) {
+                    cssPosition = "position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;";
+                } else if ("TOP_LEFT".equals(posStr)) {
+                    cssPosition = "position: absolute; top: 50px; left: 50px; text-align: left;";
+                    innerAlign = "text-align: left;";
+                } else if ("TOP_RIGHT".equals(posStr)) {
+                    cssPosition = "position: absolute; top: 50px; right: 50px; text-align: right;";
+                    innerAlign = "text-align: right;";
+                } else if ("BOTTOM_LEFT".equals(posStr)) {
+                    cssPosition = "position: absolute; bottom: 50px; left: 50px; text-align: left;";
+                    innerAlign = "text-align: left;";
+                } else if ("BOTTOM_RIGHT".equals(posStr)) {
+                    cssPosition = "position: absolute; bottom: 50px; right: 50px; text-align: right;";
+                    innerAlign = "text-align: right;";
+                } else if ("CENTER".equals(posStr)) {
+                    cssPosition = "position: absolute; top: 45%; left: 0; right: 0; text-align: center;";
+                } else if ("LEFT_MARGIN".equals(posStr)) {
                     rotation = 90f;
                     sWidth = pageSize.getHeight();
                     sHeight = pageSize.getWidth();
-                    // With 90 deg (CCW) rotation, stamp TOP matches page LEFT edge
-                    vAlign = "top";
-                    hAlign = "center";
+                    cssPosition = "position: absolute; top: 10px; left: 0; right: 0; text-align: center;";
                 } else if ("RIGHT_MARGIN".equals(posStr)) {
                     rotation = 270f;
                     sWidth = pageSize.getHeight();
                     sHeight = pageSize.getWidth();
-                    // With 270 deg (CW) rotation, stamp TOP matches page RIGHT edge
-                    vAlign = "top";
-                    hAlign = "center";
+                    cssPosition = "position: absolute; top: 10px; left: 0; right: 0; text-align: center;";
                 }
 
-                // Create a full-page unmargin'd table overlay to hold the content rigidly in
-                // place
-                String tableHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>body{margin:0;padding:0;}</style></head><body>"
-                        + "<table style=\"width: 100%; height: 100%; border-collapse: collapse; margin: 0; padding: 0;\">"
-                        + "<tr><td style=\"vertical-align: " + vAlign + "; text-align: " + hAlign + "; padding: "
-                        + padding + ";\">"
-                        + "<div style=\"display: inline-block; background-color: rgba(255,255,255,0.8); padding: 10px; border-radius: 4px; text-align: center;\">"
+                String overlayHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>body{margin:0;padding:0;}</style></head><body>"
+                        + "<div style=\"" + cssPosition + "\">"
+                        + "<div style=\"display: inline-block; background-color: rgba(255,255,255,0.8); padding: 10px; border-radius: 4px; "
+                        + innerAlign + "\">"
                         + finalHtml
-                        + "</div></td></tr></table></body></html>";
+                        + "</div></div></body></html>";
 
-                // Update Existing - Use CENTER overlay so that the 90/270 rotated bounds
-                // perfectly sit within the original page boundaries
                 StampRequest htmlReq = StampRequest.builder()
                         .stampType(StampType.HTML)
                         .position(StampPosition.CENTER)
@@ -332,7 +326,7 @@ public class StampController {
                         .build();
 
                 currentPdfBytes = stampService.applyStamp(currentPdfBytes, htmlReq,
-                        tableHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                        overlayHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             }
 
             String outputFilename = buildOutputFilename(file.getOriginalFilename());
