@@ -123,8 +123,26 @@ public class AdStampService {
         return currentPdfBytes;
     }
 
-    private String processHtmlContent(String htmlContent) {
-        // Fix relative paths for images and links
+    public String processHtmlContent(String htmlContent) {
+        // First, extract out the actual 'url' parameter if it's an adclick link so the
+        // PDF links directly
+        java.util.regex.Pattern p = java.util.regex.Pattern
+                .compile("href=\"[^\"]*?(?:\\\\?|&amp;|&)url=([^\"&]+)[^\"]*\"");
+        java.util.regex.Matcher m = p.matcher(htmlContent);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            try {
+                String decodedUrl = java.net.URLDecoder.decode(m.group(1),
+                        java.nio.charset.StandardCharsets.UTF_8.name());
+                m.appendReplacement(sb, "href=\"" + decodedUrl + "\"");
+            } catch (Exception e) {
+                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(m.group(0)));
+            }
+        }
+        m.appendTail(sb);
+        htmlContent = sb.toString();
+
+        // Fix relative paths for images and other links
         String baseUrl = "https://hwmaint.genome.cshlp.org/adsystem/";
         htmlContent = htmlContent.replace("src=\"/", "src=\"" + baseUrl);
         htmlContent = htmlContent.replace("href=\"/", "href=\"" + baseUrl);

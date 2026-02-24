@@ -241,9 +241,7 @@ public class StampController {
                 }
 
                 if (extractedAdHtml != null) {
-                    String baseUrl = "https://hwmaint.genome.cshlp.org/adsystem/";
-                    extractedAdHtml = extractedAdHtml.replace("src=\"/", "src=\"" + baseUrl)
-                            .replace("href=\"/", "href=\"" + baseUrl);
+                    extractedAdHtml = adStampService.processHtmlContent(extractedAdHtml);
                     htmlBuilder.append("<div style=\"margin-top: 10px;\">")
                             .append(extractedAdHtml).append("</div>");
                 }
@@ -312,7 +310,7 @@ public class StampController {
 
                 // Create a full-page unmargin'd table overlay to hold the content rigidly in
                 // place
-                String tableHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>html, body { margin: 0; padding: 0; width: 100%; height: 100%; }</style></head><body>"
+                String tableHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>body{margin:0;padding:0;}</style></head><body>"
                         + "<table style=\"width: 100%; height: 100%; border-collapse: collapse; margin: 0; padding: 0;\">"
                         + "<tr><td style=\"vertical-align: " + vAlign + "; text-align: " + hAlign + "; padding: "
                         + padding + ";\">"

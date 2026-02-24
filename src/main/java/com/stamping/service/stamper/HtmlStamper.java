@@ -229,6 +229,14 @@ public class HtmlStamper implements Stamper {
                             }
 
                             newLink.setAction(PdfAction.createURI(url));
+
+                            // Change the annotation border/highlight color to white to hide the default
+                            // browser link box
+                            newLink.setColor(com.itextpdf.kernel.colors.ColorConstants.WHITE);
+
+                            // Set border width to 0 to make it invisible
+                            newLink.setBorder(new com.itextpdf.kernel.pdf.PdfArray(new float[] { 0, 0, 0 }));
+
                             targetPage.addAnnotation(newLink);
                         }
                     }
