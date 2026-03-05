@@ -592,8 +592,19 @@ public class StampController {
             log.info("Received config save request: publisherId={}, jcode={}, strategy={}",
                     request.getPublisherId(), request.getJcode(), request.getStrategy());
 
-            // Ensure configs directory exists
-            File configDir = new File("configs");
+            // Validate required fields
+            if (request.getPublisherId() == null || request.getPublisherId().isBlank()) {
+                throw new StampingException("publisherId is required");
+            }
+            if (request.getJcode() == null || request.getJcode().isBlank()) {
+                throw new StampingException("jcode is required");
+            }
+
+            // Build nested directory: configs/{publisherId}/{jcode}
+            String publisherId = request.getPublisherId();
+            String jcode = request.getJcode();
+
+            File configDir = new File("configs" + File.separator + publisherId + File.separator + jcode);
             if (!configDir.exists()) {
                 configDir.mkdirs();
             }
@@ -601,9 +612,6 @@ public class StampController {
             // Build timestamped filename
             String timestamp = java.time.LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            String jcode = request.getJcode() != null && !request.getJcode().isBlank()
-                    ? request.getJcode()
-                    : "config";
             String filename = jcode + "_" + timestamp + ".json";
             File outputFile = new File(configDir, filename);
 

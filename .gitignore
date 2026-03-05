@@ -5,6 +5,7 @@ test_requests/
 !**/src/main/**/target/
 !**/src/test/**/target/
 output.pdf
+configs/
 
 ### STS ###
 .apt_generated
