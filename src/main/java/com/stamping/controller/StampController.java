@@ -578,6 +578,61 @@ public class StampController {
         }
     }
 
+    /**
+     * Save a dynamic stamp configuration as a JSON file on the server.
+     * The file is saved into a "configs" folder relative to the application's
+     * working directory.
+     *
+     * @param request the JSON configuration from the frontend
+     * @return JSON response with success status and the saved file path
+     */
+    @PostMapping(value = "/config/save", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<StampResponse> saveConfig(@RequestBody DynamicStampRequest request) {
+        try {
+            log.info("Received config save request: publisherId={}, jcode={}, strategy={}",
+                    request.getPublisherId(), request.getJcode(), request.getStrategy());
+
+            // Ensure configs directory exists
+            File configDir = new File("configs");
+            if (!configDir.exists()) {
+                configDir.mkdirs();
+            }
+
+            // Build timestamped filename
+            String timestamp = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String jcode = request.getJcode() != null && !request.getJcode().isBlank()
+                    ? request.getJcode()
+                    : "config";
+            String filename = jcode + "_" + timestamp + ".json";
+            File outputFile = new File(configDir, filename);
+
+            // Write JSON
+            String jsonContent = objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(request);
+            Files.writeString(outputFile.toPath(), jsonContent, java.nio.charset.StandardCharsets.UTF_8);
+
+            log.info("Config saved to: {}", outputFile.getAbsolutePath());
+
+            StampResponse response = StampResponse.builder()
+                    .success(true)
+                    .message("Configuration saved successfully")
+                    .outputFilePath(outputFile.getAbsolutePath())
+                    .fileSizeBytes((int) outputFile.length())
+                    .build();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Failed to save config", e);
+            StampResponse response = StampResponse.builder()
+                    .success(false)
+                    .message("Failed to save configuration: " + e.getMessage())
+                    .build();
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
     private String buildOutputFilename(String originalFilename) {
         if (originalFilename == null || originalFilename.isBlank()) {
             return "stamped.pdf";

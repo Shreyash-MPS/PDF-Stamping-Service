@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const submitBtn = document.getElementById('submitBtn');
     const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
 
     // Toggle DOI input visibility
     addDoiCheckbox.addEventListener('change', (e) => {
@@ -68,87 +69,105 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Form Submission
+    /**
+     * Read a File as a base64 data URL.
+     * Returns a promise that resolves to { base64, mimeType }.
+     */
+    function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // result is like "data:image/png;base64,iVBOR..."
+                const dataUrl = reader.result;
+                const mimeType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
+                const base64 = dataUrl.substring(dataUrl.indexOf(',') + 1);
+                resolve({ base64, mimeType });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    /**
+     * Show a toast notification.
+     */
+    function showToast(message, isError = false) {
+        toastMessage.textContent = message;
+        toast.classList.toggle('error', isError);
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 4000);
+    }
+
+    // Form Submission — build JSON, send to backend to save
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         // UI Loading State
         submitBtn.classList.add('loading');
 
-        // Gather Data
-        const formData = new FormData(form);
-        const strategy = formData.get('strategy'); // 'new_page' vs 'update_existing'
-
-        // Construct standard section configuration
-        const sectionConfig = {
-            position: formData.get('position'),
-            alignment: 'CENTER',
-            addLogo: formData.get('addLogo') === 'on',
-            imageFile: formData.get('addLogo') === 'on' ? formData.get('imageUpload') : null,
-            addText: formData.get('addText') === 'on',
-            textContent: formData.get('addText') === 'on' ? formData.get('textContent') : null,
-            addHtml: formData.get('addHtml') === 'on',
-            htmlContent: formData.get('addHtml') === 'on' ? formData.get('htmlContent') : null,
-            addDoi: formData.get('addDoi') === 'on',
-            doiValue: formData.get('addDoi') === 'on' ? formData.get('doiValue') : null,
-            addDate: formData.get('addDate') === 'on',
-            isAd: formData.get('isAd') === 'on',
-            adLink: formData.get('isAd') === 'on' ? (formData.get('adLink') || null) : null,
-            optionalText: formData.get('optionalText') || null
-        };
-
-        // Construct final Payload
-        const configPayload = {
-            publisherId: formData.get('publisherId'),
-            jcode: formData.get('jcode'),
-            strategy: strategy,
-            configuration: sectionConfig
-        };
-
-        const postData = new FormData();
-        postData.append('file', document.getElementById('sourcePdf').files[0]);
-        postData.append('config', JSON.stringify(configPayload));
-
-        if (sectionConfig.addLogo && document.getElementById('imageUpload').files.length > 0) {
-            postData.append('imageFile', document.getElementById('imageUpload').files[0]);
-        }
-
         try {
-            console.group('🚀 Sending Stamping Request');
-            console.log('Config:', configPayload);
-            console.groupEnd();
+            // Gather form data
+            const formData = new FormData(form);
+            const strategy = formData.get('strategy');
 
-            const response = await fetch('http://localhost:8080/api/v1/stamp/dynamic', {
-                method: 'POST',
-                body: postData
-            });
+            // Build configuration object
+            const sectionConfig = {
+                position: formData.get('position'),
+                alignment: 'CENTER',
+                addLogo: formData.get('addLogo') === 'on',
+                addText: formData.get('addText') === 'on',
+                textContent: formData.get('addText') === 'on' ? formData.get('textContent') : null,
+                addHtml: formData.get('addHtml') === 'on',
+                htmlContent: formData.get('addHtml') === 'on' ? formData.get('htmlContent') : null,
+                addDoi: formData.get('addDoi') === 'on',
+                doiValue: formData.get('addDoi') === 'on' ? formData.get('doiValue') : null,
+                addDate: formData.get('addDate') === 'on',
+                isAd: formData.get('isAd') === 'on',
+                adLink: formData.get('isAd') === 'on' ? (formData.get('adLink') || null) : null,
+                optionalText: formData.get('optionalText') || null
+            };
 
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(errText || response.statusText);
+            // If logo is selected, convert to base64 and embed in config
+            if (sectionConfig.addLogo && document.getElementById('imageUpload').files.length > 0) {
+                const logoFile = document.getElementById('imageUpload').files[0];
+                const { base64, mimeType } = await readFileAsBase64(logoFile);
+                sectionConfig.logoBase64 = base64;
+                sectionConfig.logoMimeType = mimeType;
             }
 
-            // Download the blob
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${configPayload.jcode || 'stamped'}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            // Construct final payload (matches DynamicStampRequest structure)
+            const configPayload = {
+                publisherId: formData.get('publisherId'),
+                jcode: formData.get('jcode'),
+                strategy: strategy,
+                configuration: sectionConfig
+            };
 
-            // Output success
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
+            console.group('📄 Saving Configuration');
+            console.log('Payload:', configPayload);
+            console.groupEnd();
+
+            // Send JSON to backend to save
+            const response = await fetch('http://localhost:8080/api/v1/config/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(configPayload)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(`Config saved: ${result.outputFilePath}`);
+            } else {
+                showToast(`Failed: ${result.message}`, true);
+            }
 
         } catch (error) {
-            console.error('Error stamping PDF:', error);
-            alert('Failed to stamp PDF.\n' + error.message);
+            console.error('Error saving config:', error);
+            showToast('Failed to save configuration. Is the server running?', true);
         } finally {
-            // Reset UI Loading State
             submitBtn.classList.remove('loading');
         }
     });

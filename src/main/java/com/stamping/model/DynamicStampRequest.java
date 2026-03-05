@@ -37,5 +37,7 @@ public class DynamicStampRequest {
         private boolean isAd;
         private String adLink;
         private String optionalText;
+        private String logoBase64;
+        private String logoMimeType;
     }
 }
