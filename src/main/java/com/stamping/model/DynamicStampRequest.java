@@ -6,38 +6,91 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DynamicStampRequest {
 
     private String publisherId;
     private String jcode;
     private String strategy;
+
+    /** Single-position config (legacy, used by /stamp/dynamic) */
     private Configuration configuration;
+
+    /** Multi-position config map: position name -> config (used by /config/save) */
+    private Map<String, Configuration> positions;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Configuration {
-        private String position;
         private String alignment;
-        private boolean addLogo;
-        private boolean addText;
-        private String textContent;
-        private boolean addHtml;
-        private String htmlContent;
-        private boolean addDoi;
-        private String doiValue;
-        private boolean addDate;
+        private boolean addNewPage;
+        private boolean includeCurrentUser;
 
-        @JsonProperty("isAd")
-        private boolean isAd;
-        private String adLink;
-        private String optionalText;
-        private String logoBase64;
-        private String logoMimeType;
+        private LogoConfig logo;
+        private TextConfig text;
+        private HtmlConfig html;
+        private DoiConfig doi;
+        private DateConfig date;
+        private AdConfig ad;
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class LogoConfig {
+            private String base64;
+            private String mimeType;
+        }
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class TextConfig {
+            private String content;
+        }
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class HtmlConfig {
+            private String content;
+        }
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class DoiConfig {
+            private String value;
+        }
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class DateConfig {
+            // Placeholder for future date format options
+            private boolean enabled = true;
+        }
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class AdConfig {
+            private String link;
+        }
     }
 }

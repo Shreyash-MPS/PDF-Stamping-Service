@@ -37,227 +37,279 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="content-grid">
+        <h1 class="page-title">PDF Stamping Configuration</h1>
+        <div class="form-column">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title">Build Configuration</h2>
 
-            <!-- Left Column — Info -->
-            <div class="info-column">
-                <h1 class="info-title">PDF Stamp<br>Configuration</h1>
-                <p class="info-subtitle">
-                    Build and save stamping configurations for your PDF documents.
-                    The generated JSON config can be used with any stamping endpoint.
-                </p>
-                <ul class="info-features">
-                    <li>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Add logos, text, HTML, or advertisements
-                    </li>
-                    <li>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Prepend new page or stamp existing pages
-                    </li>
-                    <li>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Position stamps at header, footer, or margins
-                    </li>
-                    <li>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Config saved as JSON on the server
-                    </li>
-                </ul>
-            </div>
+                    <form id="stampForm">
 
-            <!-- Right Column — Form Card -->
-            <div class="form-column">
-                <div class="card">
-                    <div class="card-body">
-                        <h2 class="card-title">Build Configuration</h2>
-
-                        <form id="stampForm">
-
-                            <!-- Global Settings -->
-                            <div class="form-section">
-                                <div class="form-section-label">Global Settings</div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="publisherId">Publisher ID</label>
-                                        <input type="text" id="publisherId" name="publisherId"
-                                            placeholder="e.g. pub_12345" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="jcode">Jcode</label>
-                                        <input type="text" id="jcode" name="jcode" placeholder="e.g. JRNL01" required>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Strategy -->
-                            <div class="form-section">
-                                <div class="form-section-label">Injection Strategy</div>
-                                <div class="strategy-toggle">
-                                    <label class="radio-label">
-                                        <input type="radio" name="strategy" value="new_page" checked>
-                                        <div class="radio-card">
-                                            <div class="icon">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    stroke-width="2">
-                                                    <path
-                                                        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z">
-                                                    </path>
-                                                    <polyline points="14 2 14 8 20 8"></polyline>
-                                                    <line x1="12" y1="18" x2="12" y2="12"></line>
-                                                    <line x1="9" y1="15" x2="15" y2="15"></line>
-                                                </svg>
-                                            </div>
-                                            <h3>New Page</h3>
-                                            <p>Prepend a new page to the document.</p>
-                                        </div>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="strategy" value="update_existing">
-                                        <div class="radio-card">
-                                            <div class="icon">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    stroke-width="2">
-                                                    <path
-                                                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7">
-                                                    </path>
-                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z">
-                                                    </path>
-                                                </svg>
-                                            </div>
-                                            <h3>Existing Pages</h3>
-                                            <p>Stamp onto native pages.</p>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- Position -->
-                            <div class="form-section">
-                                <div class="form-section-label">Position</div>
+                        <!-- Global Settings -->
+                        <div class="form-section">
+                            <div class="form-section-label">Global Settings</div>
+                            <div class="form-row">
                                 <div class="form-group">
-                                    <label for="position">Stamp Position</label>
-                                    <div class="select-wrapper">
-                                        <select id="position" name="position" required>
-                                            <option value="HEADER">Header</option>
-                                            <option value="FOOTER">Footer</option>
-                                            <option value="LEFT_MARGIN">Left Margin</option>
-                                            <option value="RIGHT_MARGIN">Right Margin</option>
-                                        </select>
+                                    <label for="publisherId">Publisher ID</label>
+                                    <input type="text" id="publisherId" name="publisherId" placeholder="e.g. pub_12345"
+                                        required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="jcode">Jcode</label>
+                                    <input type="text" id="jcode" name="jcode" placeholder="e.g. JRNL01" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stamp Positions -->
+                        <div class="form-section">
+                            <div class="form-section-label">Stamp Positions</div>
+                            <p class="form-hint">Select one or more positions and configure each independently.</p>
+
+                            <div class="positions-grid">
+
+                                <!-- HEADER -->
+                                <div class="position-block">
+                                    <div class="checkbox-group">
+                                        <label class="checkbox-container position-label">
+                                            <input type="checkbox" class="position-toggle" data-position="HEADER">
+                                            <span class="checkmark"></span>
+                                            Header
+                                        </label>
+                                    </div>
+                                    <div class="position-config" id="config-HEADER">
+                                        <div class="position-config-inner">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addNewPage"><span
+                                                        class="checkmark"></span>Add New Page</label></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addLogo"><span
+                                                        class="checkmark"></span>Add Image Logo</label></div>
+                                            <div class="form-group expanded-field" data-expand="addLogo"><label>Upload
+                                                    Image</label><input type="file" data-field="imageUpload"
+                                                    accept="image/png,image/jpeg"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addText"><span
+                                                        class="checkmark"></span>Add Custom Text</label></div>
+                                            <div class="form-group expanded-field" data-expand="addText"><label>Text
+                                                    Content</label><textarea data-field="textContent" rows="2"
+                                                    placeholder="Enter stamp text..."></textarea></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addHtml"><span
+                                                        class="checkmark"></span>Add HTML</label></div>
+                                            <div class="form-group expanded-field" data-expand="addHtml"><label>HTML
+                                                    Content</label><textarea data-field="htmlContent" rows="2"
+                                                    placeholder="<div>Your HTML</div>"></textarea></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDoi"><span
+                                                        class="checkmark"></span>Include DOI</label></div>
+                                            <div class="form-group expanded-field" data-expand="addDoi"><label>DOI
+                                                    Value</label><input type="text" data-field="doiValue"
+                                                    placeholder="e.g. 10.1234/ajnr.A123"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDate" checked><span
+                                                        class="checkmark"></span>Include Processing Date</label></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="isAd"><span
+                                                        class="checkmark"></span>Add
+                                                    Advertisement</label></div>
+                                            <div class="form-group expanded-field" data-expand="isAd"><label>Ads
+                                                    Presenter
+                                                    Link</label><input type="url" data-field="adLink"
+                                                    placeholder="https://example.com/ads"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="includeCurrentUser"><span
+                                                        class="checkmark"></span>Include Current User</label></div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <hr class="section-divider">
-
-                            <!-- Content Attributes -->
-                            <div class="form-section">
-                                <div class="form-section-label">Content &amp; Attributes</div>
-
-                                <div class="checkbox-group">
-                                    <label class="checkbox-container">
-                                        <input type="checkbox" id="addLogo" name="addLogo">
-                                        <span class="checkmark"></span>
-                                        Add Image Logo
-                                    </label>
-                                </div>
-                                <div class="form-group expanded-field" id="logoUploadWrapper">
-                                    <label for="imageUpload">Upload Image</label>
-                                    <input type="file" id="imageUpload" name="imageUpload"
-                                        accept="image/png, image/jpeg, image/jpg">
-                                </div>
-
-                                <div class="checkbox-group">
-                                    <label class="checkbox-container">
-                                        <input type="checkbox" id="addText" name="addText">
-                                        <span class="checkmark"></span>
-                                        Add Custom Text
-                                    </label>
-                                </div>
-                                <div class="form-group expanded-field" id="textInputWrapper">
-                                    <label for="textContent">Text Content</label>
-                                    <textarea id="textContent" name="textContent" rows="2"
-                                        placeholder="Enter stamp text here..."></textarea>
-                                </div>
-
-                                <div class="checkbox-group">
-                                    <label class="checkbox-container">
-                                        <input type="checkbox" id="addHtml" name="addHtml">
-                                        <span class="checkmark"></span>
-                                        Add HTML
-                                    </label>
-                                </div>
-                                <div class="form-group expanded-field" id="htmlInputWrapper">
-                                    <label for="htmlContent">HTML Content</label>
-                                    <textarea id="htmlContent" name="htmlContent" rows="2"
-                                        placeholder="<div>Your HTML here</div>"></textarea>
-                                </div>
-
-                                <hr class="section-divider">
-
-                                <div class="checkbox-group">
-                                    <label class="checkbox-container">
-                                        <input type="checkbox" id="addDoi" name="addDoi">
-                                        <span class="checkmark"></span>
-                                        Include DOI
-                                    </label>
-                                </div>
-                                <div class="form-group expanded-field" id="doiFieldWrapper">
-                                    <label for="doiValue">DOI Value</label>
-                                    <input type="text" id="doiValue" name="doiValue"
-                                        placeholder="e.g. 10.1234/ajnr.A123">
+                                <!-- FOOTER -->
+                                <div class="position-block">
+                                    <div class="checkbox-group">
+                                        <label class="checkbox-container position-label">
+                                            <input type="checkbox" class="position-toggle" data-position="FOOTER">
+                                            <span class="checkmark"></span>
+                                            Footer
+                                        </label>
+                                    </div>
+                                    <div class="position-config" id="config-FOOTER">
+                                        <div class="position-config-inner">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addNewPage"><span
+                                                        class="checkmark"></span>Add New Page</label></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addLogo"><span
+                                                        class="checkmark"></span>Add Image Logo</label></div>
+                                            <div class="form-group expanded-field" data-expand="addLogo"><label>Upload
+                                                    Image</label><input type="file" data-field="imageUpload"
+                                                    accept="image/png,image/jpeg"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addText"><span
+                                                        class="checkmark"></span>Add Custom Text</label></div>
+                                            <div class="form-group expanded-field" data-expand="addText"><label>Text
+                                                    Content</label><textarea data-field="textContent" rows="2"
+                                                    placeholder="Enter stamp text..."></textarea></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addHtml"><span
+                                                        class="checkmark"></span>Add HTML</label></div>
+                                            <div class="form-group expanded-field" data-expand="addHtml"><label>HTML
+                                                    Content</label><textarea data-field="htmlContent" rows="2"
+                                                    placeholder="<div>Your HTML</div>"></textarea></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDoi"><span
+                                                        class="checkmark"></span>Include DOI</label></div>
+                                            <div class="form-group expanded-field" data-expand="addDoi"><label>DOI
+                                                    Value</label><input type="text" data-field="doiValue"
+                                                    placeholder="e.g. 10.1234/ajnr.A123"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDate" checked><span
+                                                        class="checkmark"></span>Include Processing Date</label></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="isAd"><span
+                                                        class="checkmark"></span>Add
+                                                    Advertisement</label></div>
+                                            <div class="form-group expanded-field" data-expand="isAd"><label>Ads
+                                                    Presenter
+                                                    Link</label><input type="url" data-field="adLink"
+                                                    placeholder="https://example.com/ads"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="includeCurrentUser"><span
+                                                        class="checkmark"></span>Include Current User</label></div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="checkbox-group">
-                                    <label class="checkbox-container">
-                                        <input type="checkbox" id="addDate" name="addDate" checked>
-                                        <span class="checkmark"></span>
-                                        Include Processing Date
-                                    </label>
+                                <!-- LEFT MARGIN -->
+                                <div class="position-block">
+                                    <div class="checkbox-group">
+                                        <label class="checkbox-container position-label">
+                                            <input type="checkbox" class="position-toggle" data-position="LEFT_MARGIN">
+                                            <span class="checkmark"></span>
+                                            Left Margin
+                                        </label>
+                                    </div>
+                                    <div class="position-config" id="config-LEFT_MARGIN">
+                                        <div class="position-config-inner">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addNewPage"><span
+                                                        class="checkmark"></span>Add New Page</label></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addLogo"><span
+                                                        class="checkmark"></span>Add Image Logo</label></div>
+                                            <div class="form-group expanded-field" data-expand="addLogo"><label>Upload
+                                                    Image</label><input type="file" data-field="imageUpload"
+                                                    accept="image/png,image/jpeg"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addText"><span
+                                                        class="checkmark"></span>Add Custom Text</label></div>
+                                            <div class="form-group expanded-field" data-expand="addText"><label>Text
+                                                    Content</label><textarea data-field="textContent" rows="2"
+                                                    placeholder="Enter stamp text..."></textarea></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addHtml"><span
+                                                        class="checkmark"></span>Add HTML</label></div>
+                                            <div class="form-group expanded-field" data-expand="addHtml"><label>HTML
+                                                    Content</label><textarea data-field="htmlContent" rows="2"
+                                                    placeholder="<div>Your HTML</div>"></textarea></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDoi"><span
+                                                        class="checkmark"></span>Include DOI</label></div>
+                                            <div class="form-group expanded-field" data-expand="addDoi"><label>DOI
+                                                    Value</label><input type="text" data-field="doiValue"
+                                                    placeholder="e.g. 10.1234/ajnr.A123"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDate" checked><span
+                                                        class="checkmark"></span>Include Processing Date</label></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="isAd"><span
+                                                        class="checkmark"></span>Add
+                                                    Advertisement</label></div>
+                                            <div class="form-group expanded-field" data-expand="isAd"><label>Ads
+                                                    Presenter
+                                                    Link</label><input type="url" data-field="adLink"
+                                                    placeholder="https://example.com/ads"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="includeCurrentUser"><span
+                                                        class="checkmark"></span>Include Current User</label></div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="checkbox-group">
-                                    <label class="checkbox-container">
-                                        <input type="checkbox" id="isAd" name="isAd">
-                                        <span class="checkmark"></span>
-                                        Add Advertisement
-                                    </label>
-                                </div>
-                                <div class="form-group expanded-field" id="adLinkWrapper">
-                                    <label for="adLink">Ads Presenter Link</label>
-                                    <input type="url" id="adLink" name="adLink"
-                                        placeholder="https://example.com/click-through">
+                                <!-- RIGHT MARGIN -->
+                                <div class="position-block">
+                                    <div class="checkbox-group">
+                                        <label class="checkbox-container position-label">
+                                            <input type="checkbox" class="position-toggle" data-position="RIGHT_MARGIN">
+                                            <span class="checkmark"></span>
+                                            Right Margin
+                                        </label>
+                                    </div>
+                                    <div class="position-config" id="config-RIGHT_MARGIN">
+                                        <div class="position-config-inner">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addNewPage"><span
+                                                        class="checkmark"></span>Add New Page</label></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addLogo"><span
+                                                        class="checkmark"></span>Add Image Logo</label></div>
+                                            <div class="form-group expanded-field" data-expand="addLogo"><label>Upload
+                                                    Image</label><input type="file" data-field="imageUpload"
+                                                    accept="image/png,image/jpeg"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addText"><span
+                                                        class="checkmark"></span>Add Custom Text</label></div>
+                                            <div class="form-group expanded-field" data-expand="addText"><label>Text
+                                                    Content</label><textarea data-field="textContent" rows="2"
+                                                    placeholder="Enter stamp text..."></textarea></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addHtml"><span
+                                                        class="checkmark"></span>Add HTML</label></div>
+                                            <div class="form-group expanded-field" data-expand="addHtml"><label>HTML
+                                                    Content</label><textarea data-field="htmlContent" rows="2"
+                                                    placeholder="<div>Your HTML</div>"></textarea></div>
+                                            <hr class="section-divider">
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDoi"><span
+                                                        class="checkmark"></span>Include DOI</label></div>
+                                            <div class="form-group expanded-field" data-expand="addDoi"><label>DOI
+                                                    Value</label><input type="text" data-field="doiValue"
+                                                    placeholder="e.g. 10.1234/ajnr.A123"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="addDate" checked><span
+                                                        class="checkmark"></span>Include Processing Date</label></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="isAd"><span
+                                                        class="checkmark"></span>Add
+                                                    Advertisement</label></div>
+                                            <div class="form-group expanded-field" data-expand="isAd"><label>Ads
+                                                    Presenter
+                                                    Link</label><input type="url" data-field="adLink"
+                                                    placeholder="https://example.com/ads"></div>
+                                            <div class="checkbox-group"><label class="checkbox-container"><input
+                                                        type="checkbox" data-field="includeCurrentUser"><span
+                                                        class="checkmark"></span>Include Current User</label></div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label for="optionalText">Additional Context <span
-                                            class="badge">Optional</span></label>
-                                    <textarea id="optionalText" name="optionalText" rows="2"
-                                        placeholder="Enter any extra metadata or disclaimers here..."></textarea>
-                                </div>
-                            </div>
+                            </div><!-- /positions-grid -->
+                        </div>
 
-                            <button type="submit" class="btn btn-primary" id="submitBtn">
-                                <span class="btn-label">Save Configuration</span>
-                                <div class="loader-ring"></div>
-                            </button>
-                        </form>
-                    </div>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <span class="btn-label">Save Configuration</span>
+                            <div class="loader-ring"></div>
+                        </button>
+                    </form>
                 </div>
             </div>
-
         </div>
     </main>
 
