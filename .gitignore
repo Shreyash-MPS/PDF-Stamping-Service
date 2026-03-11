@@ -6,6 +6,8 @@ test_requests/
 !**/src/test/**/target/
 output.pdf
 configs/
+frontend/
+templates/
 
 ### STS ###
 .apt_generated

@@ -17,9 +17,9 @@ public class AdFetchService {
     }
 
     public AdResponse fetchAds(String url) {
-        log.info("Fetching ads from URL: {}", url);
+        log.info("Fetching ads from URL: '{}'", url);
         try {
-            return restTemplate.getForObject(url, AdResponse.class);
+            return restTemplate.getForObject(url.trim(), AdResponse.class);
         } catch (Exception e) {
             log.error("Error fetching ads from URL: {}", url, e);
             throw new RuntimeException("Failed to fetch ads", e);

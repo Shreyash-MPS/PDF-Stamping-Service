@@ -5,6 +5,7 @@ import com.stamping.exception.StampingException;
 import com.stamping.model.DynamicStampRequest;
 import com.stamping.model.FilePathStampRequest;
 import com.stamping.model.StampPosition;
+import com.stamping.model.TemplateRequest;
 import com.stamping.model.StampRequest;
 import com.stamping.model.StampResponse;
 import com.stamping.model.StampType;
@@ -176,6 +177,7 @@ public class StampController {
             }
 
             // Process each position
+            boolean hasAddedNewPage = false;
             for (var entry : positionsToProcess.entrySet()) {
                 String posStr = entry.getKey();
                 DynamicStampRequest.Configuration c = entry.getValue();
@@ -183,8 +185,9 @@ public class StampController {
                     continue;
 
                 // Build dynamic HTML for this position
+                boolean isNewPage = c.isAddNewPage() || (config.getStrategy() != null && "new_page".equalsIgnoreCase(config.getStrategy()));
                 StringBuilder htmlBuilder = new StringBuilder();
-                htmlBuilder.append("<div style=\"font-family: Arial, sans-serif; text-align: center;\">");
+                htmlBuilder.append("<div style=\"text-align: ").append(isNewPage ? "left" : "center").append(";\">");
 
                 // 1. Logo
                 if (c.getLogo() != null) {
@@ -287,12 +290,13 @@ public class StampController {
                             "<body style=\"margin: 50px;\">" + finalHtml + "</body></html>";
                     byte[] htmlPageBytes = metadataFrontPageService.renderHtmlToPdf(fullHtml, pageSize);
                     currentPdfBytes = metadataFrontPageService.prependPdf(currentPdfBytes, htmlPageBytes);
+                    hasAddedNewPage = true;
                 } else {
                     float rotation = 0f;
                     float sWidth = pageSize.getWidth();
                     float sHeight = pageSize.getHeight();
-                    String cssPosition = "position: absolute; left: 0; right: 0; text-align: center;";
-                    String innerAlign = "text-align: center;";
+                    String cssPosition = "position: absolute; left: 0; right: 0;";
+                    String innerAlign = "";
 
                     if ("HEADER".equals(posStr) || "TOP_CENTER".equals(posStr) || "TOP".equals(posStr)) {
                         cssPosition = "position: absolute; top: 10px; left: 0; right: 0; text-align: center;";
@@ -300,16 +304,16 @@ public class StampController {
                         cssPosition = "position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;";
                     } else if ("TOP_LEFT".equals(posStr)) {
                         cssPosition = "position: absolute; top: 50px; left: 50px; text-align: left;";
-                        innerAlign = "text-align: left;";
+                        innerAlign = "";
                     } else if ("TOP_RIGHT".equals(posStr)) {
                         cssPosition = "position: absolute; top: 50px; right: 50px; text-align: right;";
-                        innerAlign = "text-align: right;";
+                        innerAlign = "";
                     } else if ("BOTTOM_LEFT".equals(posStr)) {
                         cssPosition = "position: absolute; bottom: 50px; left: 50px; text-align: left;";
-                        innerAlign = "text-align: left;";
+                        innerAlign = "";
                     } else if ("BOTTOM_RIGHT".equals(posStr)) {
                         cssPosition = "position: absolute; bottom: 50px; right: 50px; text-align: right;";
-                        innerAlign = "text-align: right;";
+                        innerAlign = "";
                     } else if ("CENTER".equals(posStr)) {
                         cssPosition = "position: absolute; top: 45%; left: 0; right: 0; text-align: center;";
                     } else if ("LEFT_MARGIN".equals(posStr)) {
@@ -331,13 +335,20 @@ public class StampController {
                             + finalHtml
                             + "</div></div></body></html>";
 
+                    int currentTotalPages;
+                    try (com.itextpdf.kernel.pdf.PdfDocument tempDoc = new com.itextpdf.kernel.pdf.PdfDocument(
+                            new com.itextpdf.kernel.pdf.PdfReader(new java.io.ByteArrayInputStream(currentPdfBytes)))) {
+                        currentTotalPages = tempDoc.getNumberOfPages();
+                    }
+                    String targetPages = hasAddedNewPage ? "2-" + currentTotalPages : "ALL";
+
                     StampRequest htmlReq = StampRequest.builder()
                             .stampType(StampType.HTML)
                             .position(StampPosition.CENTER)
                             .opacity(1.0f)
                             .rotation(rotation)
                             .scale(1.0f)
-                            .pages("ALL")
+                            .pages(targetPages)
                             .stampWidth(sWidth)
                             .stampHeight(sHeight)
                             .build();
@@ -597,8 +608,9 @@ public class StampController {
     }
 
     /**
-     * Save a dynamic stamp configuration as a JSON file on the server.
-     * The file is saved into a "configs" folder relative to the application's
+     * Save a dynamic stamp configuration as a JSON file and rendered HTML on the
+     * server.
+     * The files are saved into a "configs" folder relative to the application's
      * working directory.
      *
      * @param request the JSON configuration from the frontend
@@ -627,24 +639,22 @@ public class StampController {
                 configDir.mkdirs();
             }
 
-            // Build timestamped filename: {publisherId}_{jcode}_{timestamp}.json
-            String timestamp = java.time.LocalDateTime.now()
-                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            String filename = publisherId + "_" + jcode + "_" + timestamp + ".json";
-            File outputFile = new File(configDir, filename);
+            // Build standardized filenames for JSON
+            String baseFilename = "config_" + publisherId + "_" + jcode;
+            File jsonOutputFile = new File(configDir, baseFilename + ".json");
 
             // Write JSON
             String jsonContent = objectMapper.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(request);
-            Files.writeString(outputFile.toPath(), jsonContent, java.nio.charset.StandardCharsets.UTF_8);
+            Files.writeString(jsonOutputFile.toPath(), jsonContent, java.nio.charset.StandardCharsets.UTF_8);
 
-            log.info("Config saved to: {}", outputFile.getAbsolutePath());
+            log.info("Config saved to: {}", jsonOutputFile.getAbsolutePath());
 
             StampResponse response = StampResponse.builder()
                     .success(true)
                     .message("Configuration saved successfully")
-                    .outputFilePath(outputFile.getAbsolutePath())
-                    .fileSizeBytes((int) outputFile.length())
+                    .outputFilePath(jsonOutputFile.getAbsolutePath())
+                    .fileSizeBytes((int) jsonOutputFile.length())
                     .build();
 
             return ResponseEntity.ok(response);
@@ -654,6 +664,141 @@ public class StampController {
             StampResponse response = StampResponse.builder()
                     .success(false)
                     .message("Failed to save configuration: " + e.getMessage())
+                    .build();
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Save a template for a specific publisher + jcode combination.
+     * The template JSON and resolved HTML are saved into the `configs` directory.
+     * Overwrites any previous versions for the same publisher+jcode pair.
+     *
+     * @param request the template data including shortcodes and HTML
+     * @return JSON response with success status and saved file path
+     */
+    @PostMapping(value = "/template/save", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<StampResponse> saveTemplate(@RequestBody TemplateRequest request) {
+        try {
+            log.info("Received template save request: publisherId={}, jcode={}, templateName={}",
+                    request.getPublisherId(), request.getJcode(), request.getTemplateName());
+
+            if (request.getPublisherId() == null || request.getPublisherId().isBlank()) {
+                throw new StampingException("publisherId is required");
+            }
+            if (request.getJcode() == null || request.getJcode().isBlank()) {
+                throw new StampingException("jcode is required");
+            }
+
+            File configDir = new File("configs");
+            if (!configDir.exists()) {
+                configDir.mkdirs();
+            }
+
+            String baseFilename = "template_" + request.getPublisherId() + "_" + request.getJcode();
+            File jsonOutputFile = new File(configDir, baseFilename + ".json");
+
+            // Write JSON
+            String jsonContent = objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(request);
+            Files.writeString(jsonOutputFile.toPath(), jsonContent, java.nio.charset.StandardCharsets.UTF_8);
+
+            log.info("Template saved to: {}", jsonOutputFile.getAbsolutePath());
+
+            StampResponse response = StampResponse.builder()
+                    .success(true)
+                    .message("Template saved successfully")
+                    .outputFilePath(jsonOutputFile.getAbsolutePath())
+                    .fileSizeBytes((int) jsonOutputFile.length())
+                    .build();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Failed to save template", e);
+            StampResponse response = StampResponse.builder()
+                    .success(false)
+                    .message("Failed to save template: " + e.getMessage())
+                    .build();
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Load a previously saved template for a publisher + jcode combination.
+     *
+     * @param publisherId the publisher ID
+     * @param jcode       the journal code
+     * @return the saved template JSON, or 404 if not found
+     */
+    @GetMapping(value = "/template/load", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> loadTemplate(
+            @RequestParam("publisherId") String publisherId,
+            @RequestParam("jcode") String jcode) {
+        try {
+            log.info("Received template load request: publisherId={}, jcode={}", publisherId, jcode);
+
+            String filename = "template_" + publisherId + "_" + jcode + ".json";
+            File templateFile = new File("configs", filename);
+
+            if (!templateFile.exists()) {
+                StampResponse response = StampResponse.builder()
+                        .success(false)
+                        .message("No template found for publisherId=" + publisherId + ", jcode=" + jcode)
+                        .build();
+                return ResponseEntity.status(404).body(response);
+            }
+
+            String jsonContent = Files.readString(templateFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            TemplateRequest template = objectMapper.readValue(jsonContent, TemplateRequest.class);
+
+            return ResponseEntity.ok(template);
+
+        } catch (Exception e) {
+            log.error("Failed to load template", e);
+            StampResponse response = StampResponse.builder()
+                    .success(false)
+                    .message("Failed to load template: " + e.getMessage())
+                    .build();
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Load a previously saved configuration for a publisher + jcode combination.
+     *
+     * @param publisherId the publisher ID
+     * @param jcode       the journal code
+     * @return the saved DynamicStampRequest JSON, or 404 if not found
+     */
+    @GetMapping(value = "/config/load", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> loadConfig(
+            @RequestParam("publisherId") String publisherId,
+            @RequestParam("jcode") String jcode) {
+        try {
+            log.info("Received config load request: publisherId={}, jcode={}", publisherId, jcode);
+
+            String filename = "config_" + publisherId + "_" + jcode + ".json";
+            File configFile = new File("configs", filename);
+
+            if (!configFile.exists()) {
+                StampResponse response = StampResponse.builder()
+                        .success(false)
+                        .message("No configuration found for publisherId=" + publisherId + ", jcode=" + jcode)
+                        .build();
+                return ResponseEntity.status(404).body(response);
+            }
+
+            String jsonContent = Files.readString(configFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            DynamicStampRequest config = objectMapper.readValue(jsonContent, DynamicStampRequest.class);
+
+            return ResponseEntity.ok(config);
+
+        } catch (Exception e) {
+            log.error("Failed to load configuration", e);
+            StampResponse response = StampResponse.builder()
+                    .success(false)
+                    .message("Failed to load configuration: " + e.getMessage())
                     .build();
             return ResponseEntity.internalServerError().body(response);
         }
