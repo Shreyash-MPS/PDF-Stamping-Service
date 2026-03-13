@@ -231,7 +231,7 @@ public class StampController {
                         expectedDoiUrl = "https://doi.org/" + config.getJcode();
                     }
                     if (!expectedDoiUrl.isEmpty()) {
-                        htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: blue;\">doi: ")
+                        htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: black;\">doi: ")
                                 .append("<a href=\"").append(expectedDoiUrl)
                                 .append("\" style=\"color: blue; text-decoration: none;\">")
                                 .append(expectedDoiUrl).append("</a></p>");
@@ -299,38 +299,34 @@ public class StampController {
                     String innerAlign = "";
 
                     if ("HEADER".equals(posStr) || "TOP_CENTER".equals(posStr) || "TOP".equals(posStr)) {
-                        cssPosition = "position: absolute; top: 10px; left: 0; right: 0; text-align: center;";
+                        cssPosition = "position: absolute; top: 0; left: 0; right: 0; text-align: center;";
                     } else if ("FOOTER".equals(posStr) || "BOTTOM_CENTER".equals(posStr) || "BOTTOM".equals(posStr)) {
-                        cssPosition = "position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;";
+                        cssPosition = "position: absolute; bottom: 0; left: 0; right: 0; text-align: center;";
                     } else if ("TOP_LEFT".equals(posStr)) {
-                        cssPosition = "position: absolute; top: 50px; left: 50px; text-align: left;";
-                        innerAlign = "";
+                        cssPosition = "position: absolute; top: 2px; left: 2px; text-align: left;";
                     } else if ("TOP_RIGHT".equals(posStr)) {
-                        cssPosition = "position: absolute; top: 50px; right: 50px; text-align: right;";
-                        innerAlign = "";
+                        cssPosition = "position: absolute; top: 2px; right: 2px; text-align: right;";
                     } else if ("BOTTOM_LEFT".equals(posStr)) {
-                        cssPosition = "position: absolute; bottom: 50px; left: 50px; text-align: left;";
-                        innerAlign = "";
+                        cssPosition = "position: absolute; bottom: 2px; left: 2px; text-align: left;";
                     } else if ("BOTTOM_RIGHT".equals(posStr)) {
-                        cssPosition = "position: absolute; bottom: 50px; right: 50px; text-align: right;";
-                        innerAlign = "";
+                        cssPosition = "position: absolute; bottom: 2px; right: 2px; text-align: right;";
                     } else if ("CENTER".equals(posStr)) {
                         cssPosition = "position: absolute; top: 45%; left: 0; right: 0; text-align: center;";
                     } else if ("LEFT_MARGIN".equals(posStr)) {
                         rotation = 90f;
                         sWidth = pageSize.getHeight();
                         sHeight = pageSize.getWidth();
-                        cssPosition = "position: absolute; top: 10px; left: 0; right: 0; text-align: center;";
+                        cssPosition = "position: absolute; top: 0; left: 0; right: 0; text-align: center;";
                     } else if ("RIGHT_MARGIN".equals(posStr)) {
                         rotation = 270f;
                         sWidth = pageSize.getHeight();
                         sHeight = pageSize.getWidth();
-                        cssPosition = "position: absolute; top: 10px; left: 0; right: 0; text-align: center;";
+                        cssPosition = "position: absolute; top: 0; left: 0; right: 0; text-align: center;";
                     }
 
                     String overlayHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>body{margin:0;padding:0;}</style></head><body>"
                             + "<div style=\"" + cssPosition + "\">"
-                            + "<div style=\"display: inline-block; background-color: rgba(255,255,255,0.8); padding: 10px; border-radius: 4px; "
+                            + "<div style=\"display: inline-block; padding: 2px 4px; "
                             + innerAlign + "\">"
                             + finalHtml
                             + "</div></div></body></html>";
@@ -370,6 +366,268 @@ public class StampController {
             throw e;
         } catch (Exception e) {
             throw new StampingException("Failed to process dynamic stamp request: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Process a journal metadata request.
+     * Drupal sends only: pdfFilePath, publisherId, jcode, and metadata values (articleTitle, authors, doiValue).
+     * The backend loads the saved config (HTML template, positions, ad links, etc.) from disk,
+     * injects the metadata into the template, and stamps all positions.
+     *
+     * @param request the JSON request containing file path, publisher/jcode, and metadata
+     * @return the stamped PDF file (or saves directly to disk if outputPath is provided)
+     */
+    @PostMapping(value = "/stamp/journal-metadata", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> processJournalMetadata(@RequestBody com.stamping.model.JournalMetadataRequest request) {
+        try {
+            log.info("Received process-journal request for file: {}", request.getPdfFilePath());
+
+            if (request.getPdfFilePath() == null || request.getPdfFilePath().isBlank()) {
+                throw new StampingException("pdfFilePath is required");
+            }
+            if (request.getPublisherId() == null || request.getPublisherId().isBlank()) {
+                throw new StampingException("publisherId is required");
+            }
+            if (request.getJcode() == null || request.getJcode().isBlank()) {
+                throw new StampingException("jcode is required");
+            }
+
+            File inputFile = new File(request.getPdfFilePath());
+            if (!inputFile.exists() || !inputFile.canRead()) {
+                throw new StampingException("Cannot read input file: " + request.getPdfFilePath());
+            }
+
+            // Load saved config from disk
+            String configFilename = "config_" + request.getPublisherId() + "_" + request.getJcode() + ".json";
+            File configFile = new File("configs", configFilename);
+            if (!configFile.exists()) {
+                throw new StampingException("No saved configuration found for publisherId="
+                        + request.getPublisherId() + ", jcode=" + request.getJcode());
+            }
+            String configJson = Files.readString(configFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            DynamicStampRequest savedConfig = objectMapper.readValue(configJson, DynamicStampRequest.class);
+
+            if (savedConfig.getPositions() == null || savedConfig.getPositions().isEmpty()) {
+                throw new StampingException("Saved configuration has no positions defined");
+            }
+
+            byte[] currentPdfBytes = Files.readAllBytes(Paths.get(request.getPdfFilePath()));
+
+            // Extract page size once
+            com.itextpdf.kernel.geom.Rectangle pageSize;
+            try (com.itextpdf.kernel.pdf.PdfDocument tempOriginal = new com.itextpdf.kernel.pdf.PdfDocument(
+                    new com.itextpdf.kernel.pdf.PdfReader(new java.io.ByteArrayInputStream(currentPdfBytes)))) {
+                pageSize = tempOriginal.getPage(1).getPageSize();
+            }
+
+            boolean hasAddedNewPage = false;
+
+            for (var entry : savedConfig.getPositions().entrySet()) {
+                String posStr = entry.getKey();
+                DynamicStampRequest.Configuration c = entry.getValue();
+                if (c == null) continue;
+
+                boolean isNewPage = c.isAddNewPage();
+
+                // For CUSTOM (cover page) positions, inject metadata from request into the saved HTML template
+                if (isNewPage && c.getHtml() != null && c.getHtml().getContent() != null) {
+                    String html = c.getHtml().getContent();
+
+                    // Replace article-title-block placeholder with actual title from Drupal
+                    if (request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
+                        html = html.replaceAll(
+                            "<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>",
+                            "<h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">"
+                                + request.getArticleTitle() + "</h1>"
+                        );
+                    } else {
+                        // Remove placeholder if Drupal didn't send this field
+                        html = html.replaceAll("<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                    }
+
+                    // Replace authors-block placeholder with actual authors from Drupal
+                    if (request.getAuthors() != null && !request.getAuthors().isBlank()) {
+                        html = html.replaceAll(
+                            "<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>",
+                            "<p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">"
+                                + request.getAuthors() + "</p>"
+                        );
+                    } else {
+                        html = html.replaceAll("<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                    }
+
+                    // Replace doi-block placeholder with actual DOI from Drupal
+                    if (request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
+                        String doiUrl = request.getDoiValue().startsWith("http") ? request.getDoiValue()
+                                : "https://doi.org/" + request.getDoiValue();
+                        html = html.replaceAll(
+                            "<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>",
+                            "<p class=\"doi-block\" style=\"margin: 0 0 4px 0;\">doi: <a href=\"" + doiUrl
+                                + "\" style=\"color: blue; text-decoration: none;\">" + doiUrl + "</a></p>"
+                        );
+                    } else {
+                        html = html.replaceAll("<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                    }
+
+                    byte[] htmlPageBytes = metadataFrontPageService.renderHtmlToPdf(html, pageSize);
+                    currentPdfBytes = metadataFrontPageService.prependPdf(currentPdfBytes, htmlPageBytes);
+                    hasAddedNewPage = true;
+                    continue;
+                }
+
+                // For overlay positions (HEADER, FOOTER, LEFT_MARGIN, RIGHT_MARGIN, etc.)
+                // All data comes from the saved config — Drupal doesn't touch these
+                StringBuilder htmlBuilder = new StringBuilder();
+                htmlBuilder.append("<div style=\"text-align: center;\">");
+
+                // Logo
+                if (c.getLogo() != null && c.getLogo().getBase64() != null && !c.getLogo().getBase64().isBlank()) {
+                    String mimeType = c.getLogo().getMimeType() != null ? c.getLogo().getMimeType() : "image/png";
+                    htmlBuilder.append("<img src=\"data:").append(mimeType).append(";base64,")
+                            .append(c.getLogo().getBase64())
+                            .append("\" style=\"max-width: 200px; display: block; margin: 0 auto; margin-bottom: 8px;\" />");
+                }
+
+                // Text
+                if (c.getText() != null && c.getText().getContent() != null && !c.getText().getContent().isBlank()) {
+                    htmlBuilder.append("<p style=\"font-size: 14px; margin: 4px 0; font-weight: bold;\">")
+                            .append(c.getText().getContent().replace("\n", "<br/>")).append("</p>");
+                }
+
+                // Raw HTML
+                if (c.getHtml() != null && c.getHtml().getContent() != null && !c.getHtml().getContent().isBlank()) {
+                    htmlBuilder.append("<div style=\"margin: 8px 0;\">")
+                            .append(c.getHtml().getContent()).append("</div>");
+                }
+
+                // DOI config object
+                if (c.getDoi() != null && c.getDoi().getValue() != null && !c.getDoi().getValue().isBlank()) {
+                    String doiUrl = c.getDoi().getValue().startsWith("http") ? c.getDoi().getValue()
+                            : "https://doi.org/" + c.getDoi().getValue();
+                    htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: black;\">doi: ")
+                            .append("<a href=\"").append(doiUrl)
+                            .append("\" style=\"color: blue; text-decoration: none;\">")
+                            .append(doiUrl).append("</a></p>");
+                }
+
+                // Date
+                if (c.getDate() != null && c.getDate().isEnabled()) {
+                    String dateStr = java.time.LocalDate.now()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+                    htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: #555;\">Date Generated: ")
+                            .append(dateStr).append("</p>");
+                }
+
+                // Ad
+                if (c.getAd() != null && c.getAd().getLink() != null && !c.getAd().getLink().isBlank()) {
+                    AdResponse adResponse = adFetchService.fetchAds(c.getAd().getLink());
+                    String extractedAdHtml = null;
+                    if (adResponse != null && adResponse.getSection() != null) {
+                        for (var section : adResponse.getSection()) {
+                            if (section.getAdLocation() != null) {
+                                for (var location : section.getAdLocation()) {
+                                    if ("header".equalsIgnoreCase(location.getPositionName())
+                                            && location.getAdData() != null) {
+                                        for (var ad : location.getAdData()) {
+                                            if (ad.getAdHtml() != null && !ad.getAdHtml().isEmpty()) {
+                                                extractedAdHtml = ad.getAdHtml();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (extractedAdHtml != null) break;
+                                }
+                            }
+                            if (extractedAdHtml != null) break;
+                        }
+                    }
+                    if (extractedAdHtml != null) {
+                        extractedAdHtml = adStampService.processHtmlContent(extractedAdHtml);
+                        htmlBuilder.append("<div style=\"margin-top: 10px;\">")
+                                .append(extractedAdHtml).append("</div>");
+                    }
+                }
+
+                htmlBuilder.append("</div>");
+                String finalHtml = htmlBuilder.toString();
+
+                // Position-specific CSS and rotation
+                float rotation = 0f;
+                float sWidth = pageSize.getWidth();
+                float sHeight = pageSize.getHeight();
+                String cssPosition = "position: absolute; left: 0; right: 0;";
+                String innerAlign = "";
+
+                if ("HEADER".equals(posStr)) {
+                    cssPosition = "position: absolute; top: 0; left: 0; right: 0; text-align: center;";
+                } else if ("FOOTER".equals(posStr)) {
+                    cssPosition = "position: absolute; bottom: 0; left: 0; right: 0; text-align: center;";
+                } else if ("LEFT_MARGIN".equals(posStr)) {
+                    rotation = 90f;
+                    sWidth = pageSize.getHeight();
+                    sHeight = pageSize.getWidth();
+                    cssPosition = "position: absolute; top: 0; left: 0; right: 0; text-align: center;";
+                } else if ("RIGHT_MARGIN".equals(posStr)) {
+                    rotation = 270f;
+                    sWidth = pageSize.getHeight();
+                    sHeight = pageSize.getWidth();
+                    cssPosition = "position: absolute; top: 0; left: 0; right: 0; text-align: center;";
+                } else if ("CENTER".equals(posStr)) {
+                    cssPosition = "position: absolute; top: 45%; left: 0; right: 0; text-align: center;";
+                }
+
+                String overlayHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>body{margin:0;padding:0;}</style></head><body>"
+                        + "<div style=\"" + cssPosition + "\">"
+                        + "<div style=\"display: inline-block; padding: 2px 4px; "
+                        + innerAlign + "\">"
+                        + finalHtml
+                        + "</div></div></body></html>";
+
+                int currentTotalPages;
+                try (com.itextpdf.kernel.pdf.PdfDocument tempDoc = new com.itextpdf.kernel.pdf.PdfDocument(
+                        new com.itextpdf.kernel.pdf.PdfReader(new java.io.ByteArrayInputStream(currentPdfBytes)))) {
+                    currentTotalPages = tempDoc.getNumberOfPages();
+                }
+                String targetPages = hasAddedNewPage ? "2-" + currentTotalPages : "ALL";
+
+                StampRequest htmlReq = StampRequest.builder()
+                        .stampType(StampType.HTML)
+                        .position(StampPosition.CENTER)
+                        .opacity(1.0f)
+                        .rotation(rotation)
+                        .scale(1.0f)
+                        .pages(targetPages)
+                        .stampWidth(sWidth)
+                        .stampHeight(sHeight)
+                        .build();
+
+                currentPdfBytes = stampService.applyStamp(currentPdfBytes, htmlReq,
+                        overlayHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+
+            String outputFilename = buildOutputFilename(inputFile.getName());
+
+            // If an outputPath was provided, save it directly
+            if (request.getOutputPath() != null && !request.getOutputPath().isBlank()) {
+                File outputFile = new File(request.getOutputPath());
+                File outputDir = outputFile.getParentFile();
+                if (outputDir != null && !outputDir.exists()) {
+                    outputDir.mkdirs();
+                }
+                Files.write(Paths.get(request.getOutputPath()), currentPdfBytes);
+            }
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + outputFilename + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .contentLength(currentPdfBytes.length)
+                    .body(currentPdfBytes);
+
+        } catch (StampingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StampingException("Failed to process journal metadata request: " + e.getMessage(), e);
         }
     }
 

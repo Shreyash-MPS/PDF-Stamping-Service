@@ -131,7 +131,7 @@ public class TextStamper implements Stamper {
 
     private float[] calculatePosition(StampRequest request, Rectangle pageSize, float contentWidth,
             float contentHeight) {
-        float margin = 20f;
+        float margin = 2f;
         StampPosition position = request.getPosition() != null ? request.getPosition() : StampPosition.CENTER;
 
         float pageW = pageSize.getWidth();

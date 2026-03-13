@@ -3,10 +3,6 @@ export const TEMPLATES = {
     name: 'Journal Article Front Page',
     shortcodes: {
       LOGO_TEXT: { label: 'Logo Image', placeholder: 'Image will render here...', default: '' },
-      ARTICLE_TITLE: { label: 'Article Title', placeholder: 'e.g. American Society of Neuroradiology...', default: '', type: 'textarea' },
-      AUTHORS: { label: 'Authors', placeholder: 'e.g. Jana Ivanidze, Ana M. Franceschi...', default: '', type: 'textarea' },
-      CITATION: { label: 'Citation Text', placeholder: 'e.g. AJNR Am J Neuroradiol 2026, 47 (2) 281-288', default: '' },
-      DOI: { label: 'DOI', placeholder: 'e.g. 10.3174/ajnr.A8959', default: '' },
       LINK: { label: 'Additional Link', placeholder: 'e.g. http://www.ajnr.org/content/47/2/281', default: '' }
     },
     htmlTemplate: `<!DOCTYPE html>
@@ -16,14 +12,13 @@ export const TEMPLATES = {
 <div style="display: flex; gap: 40px; align-items: flex-start; flex-wrap: nowrap;">
   <div style="flex: 0 0 30%; max-width: 30%; min-width: 150px; padding-top: 15px;">
     <div style="margin-bottom: 25px;" class="logo-wrapper">{{LOGO_TEXT}}</div>
-    <p style="font-size: 15px; margin: 0; line-height: 1.3;">This information is current as of {{DATE}}.</p>
+    <p class="date-block" style="font-size: 15px; margin: 0; line-height: 1.3;">This information is current as of {{DATE}}.</p>
   </div>
   <div style="flex: 1; min-width: 300px;">
-    <h1 style="font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;">{{ARTICLE_TITLE}}</h1>
-    <p style="font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;">{{AUTHORS}}</p>
+    <h1 class="article-title-block" style="font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2; color: #999; font-style: italic;">[Article Title Will Appear Here]</h1>
+    <p class="authors-block" style="font-size: 16px; line-height: 1.4; margin: 0 0 25px 0; color: #999; font-style: italic;">[Authors Will Appear Here]</p>
     <div style="font-size: 15px; line-height: 1.3;">
-      <p style="margin: 0 0 4px 0;"><i>{{CITATION}}</i></p>
-      <p style="margin: 0; color: black;">doi: <a href="https://doi.org/{{DOI}}" style="color: blue; text-decoration: none;">https://doi.org/{{DOI}}</a></p>
+      <p class="doi-block" style="margin: 0 0 4px 0; color: #999; font-style: italic;">doi: [DOI Will Appear Here]</p>
       <p style="margin: 0; color: blue;"><a href="{{LINK}}" style="color: blue; text-decoration: none;">{{LINK}}</a></p>
     </div>
   </div>

@@ -123,7 +123,7 @@ public class PdfStamper implements Stamper {
         } else {
             float pageWidth = pageBox.getWidth();
             float pageHeight = pageBox.getHeight();
-            float margin = 20f; // Default margin
+            float margin = 2f; // Default margin
 
             switch (request.getPosition()) {
                 case TOP_LEFT:

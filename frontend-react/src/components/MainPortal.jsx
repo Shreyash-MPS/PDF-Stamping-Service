@@ -8,7 +8,7 @@ const MainPortal = () => {
     const {
         publisherId, setPublisherId, jcode, setJcode,
         currentTemplateKey, setCurrentTemplateKey, templatesState, getResolvedHtmlForSave, overlayConfig,
-        updateShortcode, updateHtmlTemplate, updateOverlayConfig
+        templateConfig, updateShortcode, updateHtmlTemplate, updateOverlayConfig
     } = useTemplateContext();
 
     const [activeTab, setActiveTab] = useState('addNewPage');
@@ -176,6 +176,10 @@ const MainPortal = () => {
                     alignment: 'CENTER',
                     addNewPage: true,
                     includeCurrentUser: false,
+                    includeArticleTitle: templateConfig.includeArticleTitle,
+                    includeAuthors: templateConfig.includeAuthors,
+                    includeDoi: templateConfig.includeDoi,
+                    includeDate: templateConfig.includeDate,
                     html: { content: getResolvedHtmlForSave() }
                 };
             }

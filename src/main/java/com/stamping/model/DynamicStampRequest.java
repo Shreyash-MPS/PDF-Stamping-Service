@@ -4,8 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.Map;
@@ -35,6 +33,15 @@ public class DynamicStampRequest {
         private String alignment;
         private boolean addNewPage;
         private boolean includeCurrentUser;
+        private boolean includeArticleTitle;
+        private boolean includeAuthors;
+        private boolean includeDoi;
+        private boolean includeDate;
+
+        // Metadata fields (populated by Drupal at stamp time for CUSTOM position)
+        private String articleTitle;
+        private String authors;
+        private String doiValue;
 
         private LogoConfig logo;
         private TextConfig text;
@@ -82,7 +89,7 @@ public class DynamicStampRequest {
         @AllArgsConstructor
         public static class DateConfig {
             // Placeholder for future date format options
-            private boolean enabled = true;
+            private boolean enabled;
         }
 
         @Data

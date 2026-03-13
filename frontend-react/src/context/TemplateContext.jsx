@@ -15,8 +15,7 @@ export const TemplateProvider = ({ children }) => {
         includeDate: true,
         includeDoi: true,
         includeArticleTitle: true,
-        includeAuthors: true,
-        doiText: ''
+        includeAuthors: true
     });
 
     // State to hold the current working state of all templates
@@ -65,7 +64,7 @@ export const TemplateProvider = ({ children }) => {
         setPublisherId('');
         setJcode('');
         setCurrentTemplateKey('journal_article');
-        setTemplateConfig({ logo: null, includeDate: true, includeDoi: true, includeArticleTitle: true, includeAuthors: true, doiText: '' });
+        setTemplateConfig({ logo: null, includeDate: true, includeDoi: true, includeArticleTitle: true, includeAuthors: true });
     };
 
     // Replace shortcodes into the HTML template to get the resolved raw HTML
@@ -79,12 +78,6 @@ export const TemplateProvider = ({ children }) => {
                 // Handled below
                 return;
             }
-            if (key === 'DOI' && templateConfig.includeDoi && templateConfig.doiText) {
-                // Handled below but we'll fall back if not checked
-                return;
-            }
-            if (key === 'ARTICLE_TITLE' && !templateConfig.includeArticleTitle) return;
-            if (key === 'AUTHORS' && !templateConfig.includeAuthors) return;
 
             const sc = codes[key];
             const val = sc.value !== undefined ? sc.value : sc.default;
@@ -108,30 +101,19 @@ export const TemplateProvider = ({ children }) => {
             html = html.replace(/\{\{DATE\}\}/g, currentDateStr);
         } else {
             // Remove element containing Date
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{DATE\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
+            html = html.replace(/<[^>]*class="date-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
             html = html.replace(/\{\{DATE\}\}/g, '');
         }
 
-        // DOI replacement
-        if (templateConfig.includeDoi) {
-            const doiVal = templateConfig.doiText || (codes['DOI'] && codes['DOI'].value) || '';
-            html = html.replace(/\{\{DOI\}\}/g, doiVal);
-        } else {
-            // Remove block containing DOI
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{DOI\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
-            html = html.replace(/\{\{DOI\}\}/g, '');
-        }
-
-        // Article Title replacement
+        // Remove metadata placeholder blocks based on boolean flags
         if (!templateConfig.includeArticleTitle) {
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{ARTICLE_TITLE\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
-            html = html.replace(/\{\{ARTICLE_TITLE\}\}/g, '');
+            html = html.replace(/<[^>]*class="article-title-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
         }
-
-        // Authors replacement
         if (!templateConfig.includeAuthors) {
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{AUTHORS\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
-            html = html.replace(/\{\{AUTHORS\}\}/g, '');
+            html = html.replace(/<[^>]*class="authors-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
+        }
+        if (!templateConfig.includeDoi) {
+            html = html.replace(/<[^>]*class="doi-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
         }
 
         return html;

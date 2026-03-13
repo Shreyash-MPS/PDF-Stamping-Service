@@ -53,29 +53,27 @@ const TemplateTab = ({ enableAddNewPage, setEnableAddNewPage, handleSaveTemplate
             const dateStr = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
             html = html.replace(/\{\{DATE\}\}/g, dateStr);
         } else {
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{DATE\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
+            html = html.replace(/<[^>]*class="date-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
             html = html.replace(/\{\{DATE\}\}/g, '');
         }
 
-        // 3. Resolve DOI
-        if (templateConfig.includeDoi) {
-            const val = templateConfig.doiText || '';
-            const span = `<span contenteditable="true" data-shortcode="DOI" class="editable-shortcode ${!val ? 'placeholder-true' : ''}">${val || '10.xxxx/xxxx'}</span>`;
-            html = html.replace(/https:\/\/doi\.org\/\{\{DOI\}\}/g, `https://doi.org/${val || '10.xxxx/xxxx'}`);
-            html = html.replace(/\{\{DOI\}\}/g, span);
+        // 3. Resolve DOI visibility
+        if (!templateConfig.includeDoi) {
+            html = html.replace(/<[^>]*class="doi-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
         } else {
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{DOI\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
-            html = html.replace(/\{\{DOI\}\}/g, '');
+            html = html.replace(/(class="doi-block"[^>]*style="[^"]*)(color: #999; font-style: italic;)/g, '$1color: inherit; font-style: normal;');
         }
 
-        // 3.5 Resolve Article Title and Authors Visibility (if toggled off)
+        // 3.5 Show/hide static placeholder blocks based on boolean flags
         if (!templateConfig.includeArticleTitle) {
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{ARTICLE_TITLE\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
-            html = html.replace(/\{\{ARTICLE_TITLE\}\}/g, '');
+            html = html.replace(/<[^>]*class="article-title-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
+        } else {
+            html = html.replace(/(class="article-title-block"[^>]*style="[^"]*)(color: #999; font-style: italic;)/g, '$1color: inherit; font-style: normal;');
         }
         if (!templateConfig.includeAuthors) {
-            html = html.replace(/<[^>]*>(?:(?!<\/[^>]+>)[\s\S])*\{\{AUTHORS\}\}(?:(?!<\/[^>]+>)[\s\S])*<\/[^>]+>/g, '');
-            html = html.replace(/\{\{AUTHORS\}\}/g, '');
+            html = html.replace(/<[^>]*class="authors-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
+        } else {
+            html = html.replace(/(class="authors-block"[^>]*style="[^"]*)(color: #999; font-style: italic;)/g, '$1color: inherit; font-style: normal;');
         }
 
         // 4. Resolve all other editable shortcodes
@@ -234,9 +232,6 @@ const TemplateTab = ({ enableAddNewPage, setEnableAddNewPage, handleSaveTemplate
                                         <input type="checkbox" className="w-4 h-4 accent-[#a81732] cursor-pointer" checked={templateConfig.includeDoi} onChange={e => setTemplateConfig({ ...templateConfig, includeDoi: e.target.checked })} />
                                         <span className="text-gray-800 select-none">Add DOI</span>
                                     </label>
-                                    <div className={`overflow-hidden transition-all duration-200 ${templateConfig.includeDoi ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
-                                        <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]" placeholder="e.g. 10.3174/ajnr.A8959" value={templateConfig.doiText} onChange={e => setTemplateConfig({ ...templateConfig, doiText: e.target.value })} />
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -266,7 +261,7 @@ const TemplateTab = ({ enableAddNewPage, setEnableAddNewPage, handleSaveTemplate
                         </button>
                     </div>
                     <div className="flex-1 bg-[#e0e0e0] flex flex-col items-center justify-start p-6 overflow-y-auto min-h-0 relative">
-                        <p className={`text-[0.8rem] text-gray-500 mb-4 transition-opacity duration-200 ${enableAddNewPage ? 'opacity-100' : 'opacity-50'}`}>Click directly on the text in the preview below to edit the content inline.</p>
+                        <p className={`text-[0.8rem] text-gray-500 mb-4 transition-opacity duration-200 ${enableAddNewPage ? 'opacity-100' : 'opacity-50'}`}>Use the toggles on the left to control which metadata fields appear. Greyed-out placeholders show where Drupal data will be injected.</p>
                         <div className={`w-full max-w-[800px] bg-white shadow-lg transition-opacity duration-200 shrink-0 ${enableAddNewPage ? 'opacity-100 pointer-events-auto' : 'opacity-50 pointer-events-none'}`} style={{ aspectRatio: '1 / 1.414' }}>
                             <iframe ref={iframeRef} className="w-full h-full border-none" sandbox="allow-same-origin allow-scripts"></iframe>
                         </div>
