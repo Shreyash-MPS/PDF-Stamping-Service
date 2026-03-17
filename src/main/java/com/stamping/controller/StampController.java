@@ -371,11 +371,10 @@ public class StampController {
 
     /**
      * Process a journal metadata request.
-     * Drupal sends only: pdfFilePath, publisherId, jcode, and metadata values (articleTitle, authors, doiValue).
-     * The backend loads the saved config (HTML template, positions, ad links, etc.) from disk,
-     * injects the metadata into the template, and stamps all positions.
+     * The request JSON must contain all stamping configuration inline (positions map),
+     * along with pdfFilePath, publisherId, jcode, and metadata values.
      *
-     * @param request the JSON request containing file path, publisher/jcode, and metadata
+     * @param request the JSON request containing file path, positions config, and metadata
      * @return the stamped PDF file (or saves directly to disk if outputPath is provided)
      */
     @PostMapping(value = "/stamp/journal-metadata", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -398,19 +397,11 @@ public class StampController {
                 throw new StampingException("Cannot read input file: " + request.getPdfFilePath());
             }
 
-            // Load saved config from disk
-            String configFilename = "config_" + request.getPublisherId() + "_" + request.getJcode() + ".json";
-            File configFile = new File("configs", configFilename);
-            if (!configFile.exists()) {
-                throw new StampingException("No saved configuration found for publisherId="
-                        + request.getPublisherId() + ", jcode=" + request.getJcode());
+            // Positions must be provided inline in the request
+            if (request.getPositions() == null || request.getPositions().isEmpty()) {
+                throw new StampingException("positions map is required in the request JSON");
             }
-            String configJson = Files.readString(configFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
-            DynamicStampRequest savedConfig = objectMapper.readValue(configJson, DynamicStampRequest.class);
-
-            if (savedConfig.getPositions() == null || savedConfig.getPositions().isEmpty()) {
-                throw new StampingException("Saved configuration has no positions defined");
-            }
+            java.util.Map<String, DynamicStampRequest.Configuration> positionsToProcess = request.getPositions();
 
             byte[] currentPdfBytes = Files.readAllBytes(Paths.get(request.getPdfFilePath()));
 
@@ -421,53 +412,130 @@ public class StampController {
                 pageSize = tempOriginal.getPage(1).getPageSize();
             }
 
+            // Standard font family for all stamping output
+            String fontFamily = "Verdana, Arial, Helvetica, sans-serif";
+
             boolean hasAddedNewPage = false;
 
-            for (var entry : savedConfig.getPositions().entrySet()) {
+            for (var entry : positionsToProcess.entrySet()) {
                 String posStr = entry.getKey();
                 DynamicStampRequest.Configuration c = entry.getValue();
                 if (c == null) continue;
 
                 boolean isNewPage = c.isAddNewPage();
 
-                // For CUSTOM (cover page) positions, inject metadata from request into the saved HTML template
-                if (isNewPage && c.getHtml() != null && c.getHtml().getContent() != null) {
-                    String html = c.getHtml().getContent();
+                // For CUSTOM (cover page) positions — generate a new prepended page
+                if (isNewPage) {
+                    String html = null;
 
-                    // Replace article-title-block placeholder with actual title from Drupal
-                    if (request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
-                        html = html.replaceAll(
-                            "<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>",
-                            "<h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">"
-                                + request.getArticleTitle() + "</h1>"
-                        );
-                    } else {
-                        // Remove placeholder if Drupal didn't send this field
-                        html = html.replaceAll("<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                    // 1. Use inline html if provided in the position config
+                    if (c.getHtml() != null && c.getHtml().getContent() != null && !c.getHtml().getContent().isBlank()) {
+                        html = c.getHtml().getContent();
+
+                        // Replace date placeholder
+                        String dateStr = java.time.LocalDate.now()
+                                .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+                        html = html.replace("{{DATE}}", dateStr);
+
+                        // Replace article-title-block with actual title
+                        if (request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
+                            html = html.replaceAll(
+                                "<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>",
+                                "<h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">"
+                                    + request.getArticleTitle() + "</h1>"
+                            );
+                        } else {
+                            html = html.replaceAll("<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                        }
+
+                        // Replace authors-block
+                        if (request.getAuthors() != null && !request.getAuthors().isBlank()) {
+                            html = html.replaceAll(
+                                "<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>",
+                                "<p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">"
+                                    + request.getAuthors() + "</p>"
+                            );
+                        } else {
+                            html = html.replaceAll("<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                        }
+
+                        // Replace doi-block
+                        if (request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
+                            String doiUrl = request.getDoiValue().startsWith("http") ? request.getDoiValue()
+                                    : "https://doi.org/" + request.getDoiValue();
+                            html = html.replaceAll(
+                                "<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>",
+                                "<p class=\"doi-block\" style=\"margin: 0 0 4px 0;\">doi: <a href=\"" + doiUrl
+                                    + "\" style=\"color: blue; text-decoration: none;\">" + doiUrl + "</a></p>"
+                            );
+                        } else {
+                            html = html.replaceAll("<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                        }
+
+                        // Inject standard font family
+                        html = html.replaceAll("font-family:\\s*[^;\"]+", "font-family: " + fontFamily);
                     }
 
-                    // Replace authors-block placeholder with actual authors from Drupal
-                    if (request.getAuthors() != null && !request.getAuthors().isBlank()) {
-                        html = html.replaceAll(
-                            "<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>",
-                            "<p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">"
-                                + request.getAuthors() + "</p>"
-                        );
-                    } else {
-                        html = html.replaceAll("<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
-                    }
+                    if (html == null) {
+                        // 2. Build new page HTML dynamically from metadata flags
+                        StringBuilder newPageBuilder = new StringBuilder();
+                        newPageBuilder.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/></head>");
+                        newPageBuilder.append("<body style=\"margin: 50px; font-family: ").append(fontFamily).append("; color: #000;\">");
 
-                    // Replace doi-block placeholder with actual DOI from Drupal
-                    if (request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
-                        String doiUrl = request.getDoiValue().startsWith("http") ? request.getDoiValue()
-                                : "https://doi.org/" + request.getDoiValue();
-                        html = html.replaceAll(
-                            "<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>",
-                            "<p class=\"doi-block\" style=\"margin: 0 0 4px 0;\">doi: <a href=\"" + doiUrl
-                                + "\" style=\"color: blue; text-decoration: none;\">" + doiUrl + "</a></p>"
-                        );
-                    } else {
-                        html = html.replaceAll("<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+                        if (c.getLogo() != null && c.getLogo().getBase64() != null && !c.getLogo().getBase64().isBlank()) {
+                            String mimeType = c.getLogo().getMimeType() != null ? c.getLogo().getMimeType() : "image/png";
+                            newPageBuilder.append("<img src=\"data:").append(mimeType).append(";base64,")
+                                    .append(c.getLogo().getBase64())
+                                    .append("\" style=\"max-width: 200px; display: block; margin-bottom: 16px;\" />");
+                        }
+
+                        if (c.isIncludeArticleTitle() && request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
+                            newPageBuilder.append("<h1 style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">")
+                                    .append(request.getArticleTitle()).append("</h1>");
+                        }
+
+                        if (c.isIncludeAuthors() && request.getAuthors() != null && !request.getAuthors().isBlank()) {
+                            newPageBuilder.append("<p style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">")
+                                    .append(request.getAuthors()).append("</p>");
+                        }
+
+                        if (c.isIncludeDoi() && request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
+                            String doiUrl = request.getDoiValue().startsWith("http") ? request.getDoiValue()
+                                    : "https://doi.org/" + request.getDoiValue();
+                            newPageBuilder.append("<p style=\"margin: 0 0 4px 0; font-size: 15px;\">doi: <a href=\"")
+                                    .append(doiUrl).append("\" style=\"color: blue; text-decoration: none;\">")
+                                    .append(doiUrl).append("</a></p>");
+                        }
+
+                        if (request.getArticleCopyright() != null && !request.getArticleCopyright().isBlank()) {
+                            newPageBuilder.append("<p style=\"margin: 4px 0; font-size: 13px;\">")
+                                    .append(request.getArticleCopyright()).append("</p>");
+                        }
+
+                        if (request.getArticleIssn() != null && !request.getArticleIssn().isBlank()) {
+                            newPageBuilder.append("<p style=\"margin: 4px 0; font-size: 13px;\">ISSN: ")
+                                    .append(request.getArticleIssn()).append("</p>");
+                        }
+
+                        if (request.getArticleId() != null && !request.getArticleId().isBlank()) {
+                            newPageBuilder.append("<p style=\"margin: 4px 0; font-size: 13px;\">Article ID: ")
+                                    .append(request.getArticleId()).append("</p>");
+                        }
+
+                        if (c.getText() != null && c.getText().getContent() != null && !c.getText().getContent().isBlank()) {
+                            newPageBuilder.append("<p style=\"font-size: 14px; margin: 8px 0; font-weight: bold;\">")
+                                    .append(c.getText().getContent().replace("\n", "<br/>")).append("</p>");
+                        }
+
+                        if (c.isIncludeDate() || (c.getDate() != null && c.getDate().isEnabled())) {
+                            String dateStr = java.time.LocalDate.now()
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+                            newPageBuilder.append("<p style=\"margin: 8px 0; font-size: 13px; color: #555;\">Date Generated: ")
+                                    .append(dateStr).append("</p>");
+                        }
+
+                        newPageBuilder.append("</body></html>");
+                        html = newPageBuilder.toString();
                     }
 
                     byte[] htmlPageBytes = metadataFrontPageService.renderHtmlToPdf(html, pageSize);
@@ -577,7 +645,7 @@ public class StampController {
                     cssPosition = "position: absolute; top: 45%; left: 0; right: 0; text-align: center;";
                 }
 
-                String overlayHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>body{margin:0;padding:0;}</style></head><body>"
+                String overlayHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><style>body{margin:0;padding:0;font-family:" + fontFamily + ";}</style></head><body>"
                         + "<div style=\"" + cssPosition + "\">"
                         + "<div style=\"display: inline-block; padding: 2px 4px; "
                         + innerAlign + "\">"

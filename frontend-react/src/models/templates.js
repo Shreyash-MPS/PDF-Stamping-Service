@@ -2,13 +2,12 @@ export const TEMPLATES = {
   journal_article: {
     name: 'Journal Article Front Page',
     shortcodes: {
-      LOGO_TEXT: { label: 'Logo Image', placeholder: 'Image will render here...', default: '' },
-      LINK: { label: 'Additional Link', placeholder: 'e.g. http://www.ajnr.org/content/47/2/281', default: '' }
+      LOGO_TEXT: { label: 'Logo Image', placeholder: 'Image will render here...', default: '' }
     },
     htmlTemplate: `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"/></head>
-<body style="margin: 50px; font-family: 'Times New Roman', Times, serif; color: #000;">
+<body style="margin: 50px; font-family: Verdana, Arial, Helvetica, sans-serif; color: #000;">
 <div style="display: flex; gap: 40px; align-items: flex-start; flex-wrap: nowrap;">
   <div style="flex: 0 0 30%; max-width: 30%; min-width: 150px; padding-top: 15px;">
     <div style="margin-bottom: 25px;" class="logo-wrapper">{{LOGO_TEXT}}</div>
@@ -19,7 +18,6 @@ export const TEMPLATES = {
     <p class="authors-block" style="font-size: 16px; line-height: 1.4; margin: 0 0 25px 0; color: #999; font-style: italic;">[Authors Will Appear Here]</p>
     <div style="font-size: 15px; line-height: 1.3;">
       <p class="doi-block" style="margin: 0 0 4px 0; color: #999; font-style: italic;">doi: [DOI Will Appear Here]</p>
-      <p style="margin: 0; color: blue;"><a href="{{LINK}}" style="color: blue; text-decoration: none;">{{LINK}}</a></p>
     </div>
   </div>
 </div>
@@ -35,7 +33,7 @@ export const TEMPLATES = {
     htmlTemplate: `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"/></head>
-<body style="margin: 40px; font-family: Arial, sans-serif; text-align: center;">
+<body style="margin: 40px; font-family: Verdana, Arial, Helvetica, sans-serif; text-align: center;">
   <h1 style="font-size: 28px; color: #1a1918; margin-bottom: 8px;">{{TITLE}}</h1>
   <p style="font-size: 18px; color: #555; margin-top: 0;">{{SUBTITLE}}</p>
   <p style="font-size: 14px; color: #888; margin-top: 16px;">Date: {{DATE}}</p>
@@ -48,7 +46,7 @@ export const TEMPLATES = {
     htmlTemplate: `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"/></head>
-<body style="margin: 40px; font-family: Arial, sans-serif;">
+<body style="margin: 40px; font-family: Verdana, Arial, Helvetica, sans-serif;">
   <div>
     <!-- Write your custom HTML here -->
     <p>Custom content goes here</p>
