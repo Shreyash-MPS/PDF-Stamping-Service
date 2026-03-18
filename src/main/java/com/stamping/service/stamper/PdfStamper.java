@@ -117,7 +117,7 @@ public class PdfStamper implements Stamper {
             float stampWidth, float stampHeight) {
         float x, y;
 
-        if (request.getPosition() == StampPosition.CUSTOM) {
+        if (request.getPosition() == StampPosition.NEW_PAGE) {
             x = request.getX() != null ? request.getX() : 0;
             y = request.getY() != null ? request.getY() : 0;
         } else {

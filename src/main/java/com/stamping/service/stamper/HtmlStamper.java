@@ -275,11 +275,12 @@ public class HtmlStamper implements Stamper {
      */
     private float[] calculatePosition(StampRequest request, Rectangle pageBox,
             float stampWidth, float stampHeight) {
-        float x, y;
+        float x = 0;
+        float y = 0;
 
-        if (request.getPosition() == StampPosition.CUSTOM) {
-            x = request.getX();
-            y = request.getY();
+        if (request.getPosition() == StampPosition.NEW_PAGE) {
+            x = request.getX() != null ? request.getX() : 0;
+            y = request.getY() != null ? request.getY() : 0;
         } else {
             float pageWidth = pageBox.getWidth();
             float pageHeight = pageBox.getHeight();

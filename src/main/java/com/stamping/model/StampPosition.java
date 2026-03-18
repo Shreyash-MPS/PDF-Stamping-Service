@@ -6,7 +6,7 @@ public enum StampPosition {
     BOTTOM_LEFT,
     BOTTOM_RIGHT,
     CENTER,
-    CUSTOM,
+    NEW_PAGE,
     HEADER,
     FOOTER,
     LEFT_MARGIN,

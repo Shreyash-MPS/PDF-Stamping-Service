@@ -31,73 +31,30 @@ public class DynamicStampRequest {
     @AllArgsConstructor
     public static class Configuration {
         private String alignment;
-        private boolean addNewPage;
         private boolean includeCurrentUser;
         private boolean includeArticleTitle;
         private boolean includeAuthors;
         private boolean includeDoi;
         private boolean includeDate;
 
-        // Metadata fields (populated by Drupal at stamp time for CUSTOM position)
+        // Metadata fields (populated by Drupal at stamp time for NEW_PAGE position)
         private String articleTitle;
         private String authors;
         private String doiValue;
 
-        private LogoConfig logo;
-        private TextConfig text;
-        private HtmlConfig html;
-        private DoiConfig doi;
-        private DateConfig date;
-        private AdConfig ad;
+        // Template configuration
+        private String templateName;
 
-        @Data
-        @Builder
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class LogoConfig {
-            private String base64;
-            private String mimeType;
-        }
-
-        @Data
-        @Builder
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class TextConfig {
-            private String content;
-        }
-
-        @Data
-        @Builder
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class HtmlConfig {
-            private String content;
-        }
-
-        @Data
-        @Builder
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class DoiConfig {
-            private String value;
-        }
-
-        @Data
-        @Builder
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class DateConfig {
-            // Placeholder for future date format options
-            private boolean enabled;
-        }
-
-        @Data
-        @Builder
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class AdConfig {
-            private String link;
-        }
+        // Flattened configuration properties
+        private String logo; // base64
+        private String logoMimeType;
+        private String text;
+        private String html;
+        private String doi;
+        private String ad;
+        
+        // Link fields
+        private String linkUrl;
+        private String linkText;
     }
 }

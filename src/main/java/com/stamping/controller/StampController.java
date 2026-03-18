@@ -5,7 +5,6 @@ import com.stamping.exception.StampingException;
 import com.stamping.model.DynamicStampRequest;
 import com.stamping.model.FilePathStampRequest;
 import com.stamping.model.StampPosition;
-import com.stamping.model.TemplateRequest;
 import com.stamping.model.StampRequest;
 import com.stamping.model.StampResponse;
 import com.stamping.model.StampType;
@@ -16,6 +15,7 @@ import com.stamping.service.AdFetchService;
 import com.stamping.service.AdStampService;
 import com.stamping.service.MetadataFrontPageService;
 import com.stamping.service.StampService;
+import com.stamping.service.TemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +39,7 @@ public class StampController {
     private final AdStampService adStampService;
     private final MetadataFrontPageService metadataFrontPageService;
     private final AdFetchService adFetchService;
+    private final TemplateService templateService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -185,12 +186,12 @@ public class StampController {
                     continue;
 
                 // Build dynamic HTML for this position
-                boolean isNewPage = c.isAddNewPage() || (config.getStrategy() != null && "new_page".equalsIgnoreCase(config.getStrategy()));
+                boolean isNewPage = "NEW_PAGE".equalsIgnoreCase(posStr) || (config.getStrategy() != null && "new_page".equalsIgnoreCase(config.getStrategy()));
                 StringBuilder htmlBuilder = new StringBuilder();
                 htmlBuilder.append("<div style=\"text-align: ").append(isNewPage ? "left" : "center").append(";\">");
 
                 // 1. Logo
-                if (c.getLogo() != null) {
+                if (c.getLogo() != null && !c.getLogo().isBlank()) {
                     if (imageFile != null && !imageFile.isEmpty()) {
                         byte[] imageBytes = imageFile.getBytes();
                         String base64Image = java.util.Base64.getEncoder().encodeToString(imageBytes);
@@ -201,45 +202,44 @@ public class StampController {
                         }
                         htmlBuilder.append("<img src=\"data:").append(mimeType).append(";base64,").append(base64Image)
                                 .append("\" style=\"max-width: 200px; display: block; margin: 0 auto; margin-bottom: 8px;\" />");
-                    } else if (c.getLogo().getBase64() != null && !c.getLogo().getBase64().isBlank()) {
-                        String mimeType = c.getLogo().getMimeType() != null ? c.getLogo().getMimeType() : "image/png";
+                    } else {
+                        String mimeType = c.getLogoMimeType() != null ? c.getLogoMimeType() : "image/png";
                         htmlBuilder.append("<img src=\"data:").append(mimeType).append(";base64,")
-                                .append(c.getLogo().getBase64())
+                                .append(c.getLogo())
                                 .append("\" style=\"max-width: 200px; display: block; margin: 0 auto; margin-bottom: 8px;\" />");
                     }
                 }
 
                 // 2. Custom Text
-                if (c.getText() != null && c.getText().getContent() != null && !c.getText().getContent().isBlank()) {
+                if (c.getText() != null && !c.getText().isBlank()) {
                     htmlBuilder.append("<p style=\"font-size: 14px; margin: 4px 0; font-weight: bold;\">")
-                            .append(c.getText().getContent().replace("\n", "<br/>")).append("</p>");
+                            .append(c.getText().replace("\n", "<br/>")).append("</p>");
                 }
 
                 // 3. Raw HTML
-                if (c.getHtml() != null && c.getHtml().getContent() != null && !c.getHtml().getContent().isBlank()) {
+                if (c.getHtml() != null && !c.getHtml().isBlank()) {
                     htmlBuilder.append("<div style=\"margin: 8px 0;\">")
-                            .append(c.getHtml().getContent()).append("</div>");
+                            .append(c.getHtml()).append("</div>");
                 }
 
                 // 4. DOI
-                if (c.getDoi() != null) {
-                    String expectedDoiUrl = "";
-                    if (c.getDoi().getValue() != null && !c.getDoi().getValue().isBlank()) {
-                        expectedDoiUrl = c.getDoi().getValue().startsWith("http") ? c.getDoi().getValue()
-                                : "https://doi.org/" + c.getDoi().getValue();
-                    } else if (config.getJcode() != null && !config.getJcode().isBlank()) {
-                        expectedDoiUrl = "https://doi.org/" + config.getJcode();
-                    }
-                    if (!expectedDoiUrl.isEmpty()) {
-                        htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: black;\">doi: ")
-                                .append("<a href=\"").append(expectedDoiUrl)
-                                .append("\" style=\"color: blue; text-decoration: none;\">")
-                                .append(expectedDoiUrl).append("</a></p>");
-                    }
+                if (c.getDoi() != null && !c.getDoi().isBlank()) {
+                    String expectedDoiUrl = c.getDoi().startsWith("http") ? c.getDoi()
+                            : "https://doi.org/" + c.getDoi();
+                    htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: black;\">doi: ")
+                            .append("<a href=\"").append(expectedDoiUrl)
+                            .append("\" style=\"color: blue; text-decoration: none;\">")
+                            .append(expectedDoiUrl).append("</a></p>");
+                } else if (config.getJcode() != null && !config.getJcode().isBlank()) {
+                    String expectedDoiUrl = "https://doi.org/" + config.getJcode();
+                    htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: black;\">doi: ")
+                            .append("<a href=\"").append(expectedDoiUrl)
+                            .append("\" style=\"color: blue; text-decoration: none;\">")
+                            .append(expectedDoiUrl).append("</a></p>");
                 }
 
                 // 5. Date
-                if (c.getDate() != null && c.getDate().isEnabled()) {
+                if (c.isIncludeDate()) {
                     String dateStr = java.time.LocalDate.now()
                             .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
                     htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: #555;\">Date Generated: ")
@@ -247,8 +247,8 @@ public class StampController {
                 }
 
                 // 6. Ad Embedding
-                if (c.getAd() != null && c.getAd().getLink() != null && !c.getAd().getLink().isBlank()) {
-                    AdResponse adResponse = adFetchService.fetchAds(c.getAd().getLink());
+                if (c.getAd() != null && !c.getAd().isBlank()) {
+                    AdResponse adResponse = adFetchService.fetchAds(c.getAd());
                     String extractedAdHtml = null;
                     if (adResponse != null && adResponse.getSection() != null) {
                         for (var section : adResponse.getSection()) {
@@ -281,8 +281,8 @@ public class StampController {
                 htmlBuilder.append("</div>");
                 String finalHtml = htmlBuilder.toString();
 
-                // Decide strategy: per-position addNewPage or global strategy fallback
-                boolean shouldAddNewPage = c.isAddNewPage()
+                // Decide strategy: per-position NEW_PAGE or global strategy fallback
+                boolean shouldAddNewPage = "NEW_PAGE".equalsIgnoreCase(posStr)
                         || "new_page".equalsIgnoreCase(config.getStrategy());
 
                 if (shouldAddNewPage) {
@@ -422,121 +422,49 @@ public class StampController {
                 DynamicStampRequest.Configuration c = entry.getValue();
                 if (c == null) continue;
 
-                boolean isNewPage = c.isAddNewPage();
+                boolean isNewPage = "NEW_PAGE".equalsIgnoreCase(posStr);
 
-                // For CUSTOM (cover page) positions — generate a new prepended page
+                // For NEW_PAGE (cover page) positions — generate a new prepended page
                 if (isNewPage) {
-                    String html = null;
+                    String html = "";
 
-                    // 1. Use inline html if provided in the position config
-                    if (c.getHtml() != null && c.getHtml().getContent() != null && !c.getHtml().getContent().isBlank()) {
-                        html = c.getHtml().getContent();
-
-                        // Replace date placeholder
-                        String dateStr = java.time.LocalDate.now()
-                                .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
-                        html = html.replace("{{DATE}}", dateStr);
-
-                        // Replace article-title-block with actual title
-                        if (request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
-                            html = html.replaceAll(
-                                "<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>",
-                                "<h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">"
-                                    + request.getArticleTitle() + "</h1>"
-                            );
-                        } else {
-                            html = html.replaceAll("<[^>]*class=\"article-title-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
-                        }
-
-                        // Replace authors-block
-                        if (request.getAuthors() != null && !request.getAuthors().isBlank()) {
-                            html = html.replaceAll(
-                                "<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>",
-                                "<p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">"
-                                    + request.getAuthors() + "</p>"
-                            );
-                        } else {
-                            html = html.replaceAll("<[^>]*class=\"authors-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
-                        }
-
-                        // Replace doi-block
-                        if (request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
-                            String doiUrl = request.getDoiValue().startsWith("http") ? request.getDoiValue()
-                                    : "https://doi.org/" + request.getDoiValue();
-                            html = html.replaceAll(
-                                "<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>",
-                                "<p class=\"doi-block\" style=\"margin: 0 0 4px 0;\">doi: <a href=\"" + doiUrl
-                                    + "\" style=\"color: blue; text-decoration: none;\">" + doiUrl + "</a></p>"
-                            );
-                        } else {
-                            html = html.replaceAll("<[^>]*class=\"doi-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
-                        }
-
-                        // Inject standard font family
-                        html = html.replaceAll("font-family:\\s*[^;\"]+", "font-family: " + fontFamily);
+                    // 1. Resolve Template if templateName is provided
+                    if (c.getTemplateName() != null && !c.getTemplateName().isBlank()) {
+                        html += templateService.renderTemplate(c, request);
+                    } else if (c.getHtml() == null || c.getHtml().isBlank()) {
+                        // Fallback to default_metadata if no templateName and no custom HTML is provided
+                        // Temporarily set template name to default_metadata for this call
+                        String origTemplateName = c.getTemplateName();
+                        c.setTemplateName("default_metadata");
+                        html += templateService.renderTemplate(c, request);
+                        c.setTemplateName(origTemplateName);
                     }
 
-                    if (html == null) {
-                        // 2. Build new page HTML dynamically from metadata flags
-                        StringBuilder newPageBuilder = new StringBuilder();
-                        newPageBuilder.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/></head>");
-                        newPageBuilder.append("<body style=\"margin: 50px; font-family: ").append(fontFamily).append("; color: #000;\">");
-
-                        if (c.getLogo() != null && c.getLogo().getBase64() != null && !c.getLogo().getBase64().isBlank()) {
-                            String mimeType = c.getLogo().getMimeType() != null ? c.getLogo().getMimeType() : "image/png";
-                            newPageBuilder.append("<img src=\"data:").append(mimeType).append(";base64,")
-                                    .append(c.getLogo().getBase64())
-                                    .append("\" style=\"max-width: 200px; display: block; margin-bottom: 16px;\" />");
+                    // 2. Append custom layout HTML if provided
+                    if (c.getHtml() != null && !c.getHtml().isBlank()) {
+                        // If we already rendered a template, we just append the custom HTML at the end.
+                        // If there was no template, we just use the custom HTML (wrapped in basic body if it doesn't have it).
+                        String customHtml = c.getHtml();
+                        if (!html.isEmpty()) {
+                            // Inject custom HTML before the closing body tag
+                            if (html.contains("</body>")) {
+                                html = html.replace("</body>", "<div>" + customHtml + "</div></body>");
+                            } else {
+                                html += "<div>" + customHtml + "</div>";
+                            }
+                        } else {
+                            if (!customHtml.contains("<html")) {
+                                html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/></head><body style=\"margin: 50px; font-family: " + fontFamily + "; color: #000;\">"
+                                        + customHtml + "</body></html>";
+                            } else {
+                                html = customHtml;
+                            }
                         }
-
-                        if (c.isIncludeArticleTitle() && request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
-                            newPageBuilder.append("<h1 style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">")
-                                    .append(request.getArticleTitle()).append("</h1>");
-                        }
-
-                        if (c.isIncludeAuthors() && request.getAuthors() != null && !request.getAuthors().isBlank()) {
-                            newPageBuilder.append("<p style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">")
-                                    .append(request.getAuthors()).append("</p>");
-                        }
-
-                        if (c.isIncludeDoi() && request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
-                            String doiUrl = request.getDoiValue().startsWith("http") ? request.getDoiValue()
-                                    : "https://doi.org/" + request.getDoiValue();
-                            newPageBuilder.append("<p style=\"margin: 0 0 4px 0; font-size: 15px;\">doi: <a href=\"")
-                                    .append(doiUrl).append("\" style=\"color: blue; text-decoration: none;\">")
-                                    .append(doiUrl).append("</a></p>");
-                        }
-
-                        if (request.getArticleCopyright() != null && !request.getArticleCopyright().isBlank()) {
-                            newPageBuilder.append("<p style=\"margin: 4px 0; font-size: 13px;\">")
-                                    .append(request.getArticleCopyright()).append("</p>");
-                        }
-
-                        if (request.getArticleIssn() != null && !request.getArticleIssn().isBlank()) {
-                            newPageBuilder.append("<p style=\"margin: 4px 0; font-size: 13px;\">ISSN: ")
-                                    .append(request.getArticleIssn()).append("</p>");
-                        }
-
-                        if (request.getArticleId() != null && !request.getArticleId().isBlank()) {
-                            newPageBuilder.append("<p style=\"margin: 4px 0; font-size: 13px;\">Article ID: ")
-                                    .append(request.getArticleId()).append("</p>");
-                        }
-
-                        if (c.getText() != null && c.getText().getContent() != null && !c.getText().getContent().isBlank()) {
-                            newPageBuilder.append("<p style=\"font-size: 14px; margin: 8px 0; font-weight: bold;\">")
-                                    .append(c.getText().getContent().replace("\n", "<br/>")).append("</p>");
-                        }
-
-                        if (c.isIncludeDate() || (c.getDate() != null && c.getDate().isEnabled())) {
-                            String dateStr = java.time.LocalDate.now()
-                                    .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
-                            newPageBuilder.append("<p style=\"margin: 8px 0; font-size: 13px; color: #555;\">Date Generated: ")
-                                    .append(dateStr).append("</p>");
-                        }
-
-                        newPageBuilder.append("</body></html>");
-                        html = newPageBuilder.toString();
                     }
+
+                    // 3. Render HTML to PDF and prepend
+
+
 
                     byte[] htmlPageBytes = metadataFrontPageService.renderHtmlToPdf(html, pageSize);
                     currentPdfBytes = metadataFrontPageService.prependPdf(currentPdfBytes, htmlPageBytes);
@@ -550,29 +478,29 @@ public class StampController {
                 htmlBuilder.append("<div style=\"text-align: center;\">");
 
                 // Logo
-                if (c.getLogo() != null && c.getLogo().getBase64() != null && !c.getLogo().getBase64().isBlank()) {
-                    String mimeType = c.getLogo().getMimeType() != null ? c.getLogo().getMimeType() : "image/png";
+                if (c.getLogo() != null && !c.getLogo().isBlank()) {
+                    String mimeType = c.getLogoMimeType() != null ? c.getLogoMimeType() : "image/png";
                     htmlBuilder.append("<img src=\"data:").append(mimeType).append(";base64,")
-                            .append(c.getLogo().getBase64())
+                            .append(c.getLogo())
                             .append("\" style=\"max-width: 200px; display: block; margin: 0 auto; margin-bottom: 8px;\" />");
                 }
 
                 // Text
-                if (c.getText() != null && c.getText().getContent() != null && !c.getText().getContent().isBlank()) {
+                if (c.getText() != null && !c.getText().isBlank()) {
                     htmlBuilder.append("<p style=\"font-size: 14px; margin: 4px 0; font-weight: bold;\">")
-                            .append(c.getText().getContent().replace("\n", "<br/>")).append("</p>");
+                            .append(c.getText().replace("\n", "<br/>")).append("</p>");
                 }
 
                 // Raw HTML
-                if (c.getHtml() != null && c.getHtml().getContent() != null && !c.getHtml().getContent().isBlank()) {
+                if (c.getHtml() != null && !c.getHtml().isBlank()) {
                     htmlBuilder.append("<div style=\"margin: 8px 0;\">")
-                            .append(c.getHtml().getContent()).append("</div>");
+                            .append(c.getHtml()).append("</div>");
                 }
 
                 // DOI config object
-                if (c.getDoi() != null && c.getDoi().getValue() != null && !c.getDoi().getValue().isBlank()) {
-                    String doiUrl = c.getDoi().getValue().startsWith("http") ? c.getDoi().getValue()
-                            : "https://doi.org/" + c.getDoi().getValue();
+                if (c.getDoi() != null && !c.getDoi().isBlank()) {
+                    String doiUrl = c.getDoi().startsWith("http") ? c.getDoi()
+                            : "https://doi.org/" + c.getDoi();
                     htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: black;\">doi: ")
                             .append("<a href=\"").append(doiUrl)
                             .append("\" style=\"color: blue; text-decoration: none;\">")
@@ -580,7 +508,7 @@ public class StampController {
                 }
 
                 // Date
-                if (c.getDate() != null && c.getDate().isEnabled()) {
+                if (c.isIncludeDate()) {
                     String dateStr = java.time.LocalDate.now()
                             .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
                     htmlBuilder.append("<p style=\"margin: 4px 0; font-size: 12px; color: #555;\">Date Generated: ")
@@ -588,8 +516,8 @@ public class StampController {
                 }
 
                 // Ad
-                if (c.getAd() != null && c.getAd().getLink() != null && !c.getAd().getLink().isBlank()) {
-                    AdResponse adResponse = adFetchService.fetchAds(c.getAd().getLink());
+                if (c.getAd() != null && !c.getAd().isBlank()) {
+                    AdResponse adResponse = adFetchService.fetchAds(c.getAd());
                     String extractedAdHtml = null;
                     if (adResponse != null && adResponse.getSection() != null) {
                         for (var section : adResponse.getSection()) {
@@ -933,200 +861,138 @@ public class StampController {
         }
     }
 
+    // ─── Frontend Config CRUD ───────────────────────────────────────────
+
     /**
-     * Save a dynamic stamp configuration as a JSON file and rendered HTML on the
-     * server.
-     * The files are saved into a "configs" folder relative to the application's
-     * working directory.
-     *
-     * @param request the JSON configuration from the frontend
-     * @return JSON response with success status and the saved file path
+     * List all saved frontend configurations.
+     * Reads every config_*.json from the configs/ directory.
      */
-    @PostMapping(value = "/config/save", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<StampResponse> saveConfig(@RequestBody DynamicStampRequest request) {
+    @GetMapping(value = "/configs", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listConfigs() {
         try {
-            log.info("Received config save request: publisherId={}, jcode={}, strategy={}",
-                    request.getPublisherId(), request.getJcode(), request.getStrategy());
-
-            // Validate required fields
-            if (request.getPublisherId() == null || request.getPublisherId().isBlank()) {
-                throw new StampingException("publisherId is required");
+            File configDir = new File("configs");
+            java.util.List<Object> results = new java.util.ArrayList<>();
+            if (configDir.exists() && configDir.isDirectory()) {
+                File[] files = configDir.listFiles((dir, name) -> name.startsWith("config_") && name.endsWith(".json"));
+                if (files != null) {
+                    java.util.Arrays.sort(files);
+                    for (File f : files) {
+                        String content = Files.readString(f.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                        results.add(objectMapper.readValue(content, Object.class));
+                    }
+                }
             }
-            if (request.getJcode() == null || request.getJcode().isBlank()) {
-                throw new StampingException("jcode is required");
-            }
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            log.error("Failed to list configs", e);
+            return ResponseEntity.internalServerError().body(StampResponse.builder()
+                    .success(false).message("Failed to list configurations: " + e.getMessage()).build());
+        }
+    }
 
-            // Save into flat configs/ directory
-            String publisherId = request.getPublisherId();
-            String jcode = request.getJcode();
+    /**
+     * Get a single configuration by pubId and jcode.
+     */
+    @GetMapping(value = "/configs/{pubId}/{jcode}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getConfig(@PathVariable String pubId, @PathVariable String jcode) {
+        try {
+            File configFile = new File("configs", "config_" + pubId + "_" + jcode + ".json");
+            if (!configFile.exists()) {
+                return ResponseEntity.status(404).body(StampResponse.builder()
+                        .success(false).message("No configuration found for pubId=" + pubId + ", jcode=" + jcode).build());
+            }
+            String content = Files.readString(configFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            return ResponseEntity.ok(objectMapper.readValue(content, Object.class));
+        } catch (Exception e) {
+            log.error("Failed to get config", e);
+            return ResponseEntity.internalServerError().body(StampResponse.builder()
+                    .success(false).message("Failed to get configuration: " + e.getMessage()).build());
+        }
+    }
+
+    /**
+     * Save (create or update) a frontend configuration.
+     * Expects the raw frontend JSON with pubId, jcode, templateName, newPage, header, etc.
+     * Saves to configs/config_{pubId}_{jcode}.json.
+     */
+    @PostMapping(value = "/configs", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<StampResponse> saveConfig(@RequestBody java.util.Map<String, Object> rawConfig) {
+        try {
+            String pubId = (String) rawConfig.get("pubId");
+            String jcode = (String) rawConfig.get("jcode");
+
+            if (pubId == null || pubId.isBlank() || jcode == null || jcode.isBlank()) {
+                throw new StampingException("pubId and jcode are required");
+            }
 
             File configDir = new File("configs");
-            if (!configDir.exists()) {
-                configDir.mkdirs();
-            }
+            if (!configDir.exists()) configDir.mkdirs();
 
-            // Build standardized filenames for JSON
-            String baseFilename = "config_" + publisherId + "_" + jcode;
-            File jsonOutputFile = new File(configDir, baseFilename + ".json");
+            File outputFile = new File(configDir, "config_" + pubId + "_" + jcode + ".json");
+            String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(rawConfig);
+            Files.writeString(outputFile.toPath(), json, java.nio.charset.StandardCharsets.UTF_8);
 
-            // Write JSON
-            String jsonContent = objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(request);
-            Files.writeString(jsonOutputFile.toPath(), jsonContent, java.nio.charset.StandardCharsets.UTF_8);
+            log.info("Config saved: {}", outputFile.getAbsolutePath());
 
-            log.info("Config saved to: {}", jsonOutputFile.getAbsolutePath());
-
-            StampResponse response = StampResponse.builder()
-                    .success(true)
-                    .message("Configuration saved successfully")
-                    .outputFilePath(jsonOutputFile.getAbsolutePath())
-                    .fileSizeBytes((int) jsonOutputFile.length())
-                    .build();
-
-            return ResponseEntity.ok(response);
-
+            return ResponseEntity.ok(StampResponse.builder()
+                    .success(true).message("Configuration saved successfully")
+                    .outputFilePath(outputFile.getAbsolutePath()).build());
         } catch (Exception e) {
             log.error("Failed to save config", e);
-            StampResponse response = StampResponse.builder()
-                    .success(false)
-                    .message("Failed to save configuration: " + e.getMessage())
-                    .build();
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(StampResponse.builder()
+                    .success(false).message("Failed to save configuration: " + e.getMessage()).build());
         }
     }
 
     /**
-     * Save a template for a specific publisher + jcode combination.
-     * The template JSON and resolved HTML are saved into the `configs` directory.
-     * Overwrites any previous versions for the same publisher+jcode pair.
-     *
-     * @param request the template data including shortcodes and HTML
-     * @return JSON response with success status and saved file path
+     * Archive (soft-delete) a configuration.
      */
-    @PostMapping(value = "/template/save", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<StampResponse> saveTemplate(@RequestBody TemplateRequest request) {
+    @DeleteMapping(value = "/configs/{pubId}/{jcode}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<StampResponse> archiveConfig(@PathVariable String pubId, @PathVariable String jcode) {
         try {
-            log.info("Received template save request: publisherId={}, jcode={}, templateName={}",
-                    request.getPublisherId(), request.getJcode(), request.getTemplateName());
-
-            if (request.getPublisherId() == null || request.getPublisherId().isBlank()) {
-                throw new StampingException("publisherId is required");
-            }
-            if (request.getJcode() == null || request.getJcode().isBlank()) {
-                throw new StampingException("jcode is required");
-            }
-
-            File configDir = new File("configs");
-            if (!configDir.exists()) {
-                configDir.mkdirs();
-            }
-
-            String baseFilename = "template_" + request.getPublisherId() + "_" + request.getJcode();
-            File jsonOutputFile = new File(configDir, baseFilename + ".json");
-
-            // Write JSON
-            String jsonContent = objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(request);
-            Files.writeString(jsonOutputFile.toPath(), jsonContent, java.nio.charset.StandardCharsets.UTF_8);
-
-            log.info("Template saved to: {}", jsonOutputFile.getAbsolutePath());
-
-            StampResponse response = StampResponse.builder()
-                    .success(true)
-                    .message("Template saved successfully")
-                    .outputFilePath(jsonOutputFile.getAbsolutePath())
-                    .fileSizeBytes((int) jsonOutputFile.length())
-                    .build();
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Failed to save template", e);
-            StampResponse response = StampResponse.builder()
-                    .success(false)
-                    .message("Failed to save template: " + e.getMessage())
-                    .build();
-            return ResponseEntity.internalServerError().body(response);
-        }
-    }
-
-    /**
-     * Load a previously saved template for a publisher + jcode combination.
-     *
-     * @param publisherId the publisher ID
-     * @param jcode       the journal code
-     * @return the saved template JSON, or 404 if not found
-     */
-    @GetMapping(value = "/template/load", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> loadTemplate(
-            @RequestParam("publisherId") String publisherId,
-            @RequestParam("jcode") String jcode) {
-        try {
-            log.info("Received template load request: publisherId={}, jcode={}", publisherId, jcode);
-
-            String filename = "template_" + publisherId + "_" + jcode + ".json";
-            File templateFile = new File("configs", filename);
-
-            if (!templateFile.exists()) {
-                StampResponse response = StampResponse.builder()
-                        .success(false)
-                        .message("No template found for publisherId=" + publisherId + ", jcode=" + jcode)
-                        .build();
-                return ResponseEntity.status(404).body(response);
-            }
-
-            String jsonContent = Files.readString(templateFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
-            TemplateRequest template = objectMapper.readValue(jsonContent, TemplateRequest.class);
-
-            return ResponseEntity.ok(template);
-
-        } catch (Exception e) {
-            log.error("Failed to load template", e);
-            StampResponse response = StampResponse.builder()
-                    .success(false)
-                    .message("Failed to load template: " + e.getMessage())
-                    .build();
-            return ResponseEntity.internalServerError().body(response);
-        }
-    }
-
-    /**
-     * Load a previously saved configuration for a publisher + jcode combination.
-     *
-     * @param publisherId the publisher ID
-     * @param jcode       the journal code
-     * @return the saved DynamicStampRequest JSON, or 404 if not found
-     */
-    @GetMapping(value = "/config/load", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> loadConfig(
-            @RequestParam("publisherId") String publisherId,
-            @RequestParam("jcode") String jcode) {
-        try {
-            log.info("Received config load request: publisherId={}, jcode={}", publisherId, jcode);
-
-            String filename = "config_" + publisherId + "_" + jcode + ".json";
-            File configFile = new File("configs", filename);
-
+            File configFile = new File("configs", "config_" + pubId + "_" + jcode + ".json");
             if (!configFile.exists()) {
-                StampResponse response = StampResponse.builder()
-                        .success(false)
-                        .message("No configuration found for publisherId=" + publisherId + ", jcode=" + jcode)
-                        .build();
-                return ResponseEntity.status(404).body(response);
+                return ResponseEntity.status(404).body(StampResponse.builder()
+                        .success(false).message("Configuration not found").build());
             }
-
-            String jsonContent = Files.readString(configFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
-            DynamicStampRequest config = objectMapper.readValue(jsonContent, DynamicStampRequest.class);
-
-            return ResponseEntity.ok(config);
-
+            String content = Files.readString(configFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> config = objectMapper.readValue(content, java.util.Map.class);
+            config.put("archived", true);
+            Files.writeString(configFile.toPath(),
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(config),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            return ResponseEntity.ok(StampResponse.builder().success(true).message("Configuration archived").build());
         } catch (Exception e) {
-            log.error("Failed to load configuration", e);
-            StampResponse response = StampResponse.builder()
-                    .success(false)
-                    .message("Failed to load configuration: " + e.getMessage())
-                    .build();
-            return ResponseEntity.internalServerError().body(response);
+            log.error("Failed to archive config", e);
+            return ResponseEntity.internalServerError().body(StampResponse.builder()
+                    .success(false).message("Failed to archive: " + e.getMessage()).build());
+        }
+    }
+
+    /**
+     * Restore an archived configuration.
+     */
+    @PutMapping(value = "/configs/{pubId}/{jcode}/restore", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<StampResponse> restoreConfig(@PathVariable String pubId, @PathVariable String jcode) {
+        try {
+            File configFile = new File("configs", "config_" + pubId + "_" + jcode + ".json");
+            if (!configFile.exists()) {
+                return ResponseEntity.status(404).body(StampResponse.builder()
+                        .success(false).message("Configuration not found").build());
+            }
+            String content = Files.readString(configFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> config = objectMapper.readValue(content, java.util.Map.class);
+            config.put("archived", false);
+            Files.writeString(configFile.toPath(),
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(config),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            return ResponseEntity.ok(StampResponse.builder().success(true).message("Configuration restored").build());
+        } catch (Exception e) {
+            log.error("Failed to restore config", e);
+            return ResponseEntity.internalServerError().body(StampResponse.builder()
+                    .success(false).message("Failed to restore: " + e.getMessage()).build());
         }
     }
 
