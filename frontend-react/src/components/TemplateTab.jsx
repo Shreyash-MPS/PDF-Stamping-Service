@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTemplateContext } from '../context/TemplateContext';
 
-const TemplateTab = ({ enableAddNewPage, setEnableAddNewPage, handleSaveTemplate }) => {
+const TemplateTab = ({ enableAddNewPage, setEnableAddNewPage }) => {
     const navigate = useNavigate();
     const {
         currentTemplateKey, setCurrentTemplateKey,
@@ -236,16 +236,6 @@ const TemplateTab = ({ enableAddNewPage, setEnableAddNewPage, handleSaveTemplate
                             </div>
                         </div>
 
-                        <div className={`flex gap-3 mt-5 transition-opacity duration-200 ${enableAddNewPage ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-                            <button type="button" className="inline-flex justify-center items-center gap-2 w-full px-5 py-2.5 bg-[#f0f0f0] text-gray-800 border border-gray-300 rounded-md text-[0.9rem] font-semibold uppercase tracking-wide cursor-pointer hover:bg-[#e4e4e4] hover:border-gray-400 transition duration-150" onClick={handleSaveTemplate}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 shrink-0">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                    <polyline points="17 21 17 13 7 13 7 21" />
-                                    <polyline points="7 3 7 8 15 8" />
-                                </svg>
-                                Save Template Defaults
-                            </button>
-                        </div>
                     </div>
                 </div>
 

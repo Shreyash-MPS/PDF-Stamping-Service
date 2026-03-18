@@ -7,7 +7,7 @@ const PAGE_SIZE = 20;
 
 const ConfigTable = () => {
     const navigate = useNavigate();
-    const { publishers, getTableRows, deleteConfig, restoreConfig } = useConfigContext();
+    const { publishers, getTableRows, deleteConfig, restoreConfig, loading } = useConfigContext();
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [filterPubId, setFilterPubId] = useState('');
@@ -94,7 +94,11 @@ const ConfigTable = () => {
                 </div>
 
                 {/* Table */}
-                {rows.length === 0 ? (
+                {loading ? (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+                        <p className="text-gray-400 text-lg">Loading configurations...</p>
+                    </div>
+                ) : rows.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                         <p className="text-gray-400 text-lg mb-2">No configurations yet</p>
                         <p className="text-gray-400 text-sm">Click "Add Configuration" to get started.</p>

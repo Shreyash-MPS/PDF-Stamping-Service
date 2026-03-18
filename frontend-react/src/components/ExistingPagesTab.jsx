@@ -4,8 +4,8 @@ import { useTemplateContext } from '../context/TemplateContext';
 const POSITIONS = [
     { key: 'header', label: 'Header', shortLabel: 'H' },
     { key: 'footer', label: 'Footer', shortLabel: 'F' },
-    { key: 'leftMargin', label: 'Left Margin', shortLabel: 'L' },
-    { key: 'rightMargin', label: 'Right Margin', shortLabel: 'R' },
+    { key: 'leftMargin', label: 'Left Side', shortLabel: 'L' },
+    { key: 'rightMargin', label: 'Right Side', shortLabel: 'R' },
 ];
 
 const PositionConfigPanel = ({ positionKey, positionLabel, onClose }) => {
@@ -54,8 +54,26 @@ const PositionConfigPanel = ({ positionKey, positionLabel, onClose }) => {
                         <input type="checkbox" className="w-4 h-4 accent-[#a81732]" checked={config.text !== '' && config.text !== undefined} onChange={e => updateOverlayConfig(positionKey, 'text', e.target.checked ? ' ' : '')} />
                         <span className="text-gray-800 select-none">Add Plain Text</span>
                     </label>
-                    <div className={`overflow-hidden transition-all duration-200 ${config.text ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className={`overflow-hidden transition-all duration-200 ${config.text !== '' && config.text !== undefined ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
                         <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]" placeholder="Enter text to stamp" value={config.text} onChange={handleChange('text')} />
+                    </div>
+                </div>
+
+                {/* Link */}
+                <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input type="checkbox" className="w-4 h-4 accent-[#a81732]" checked={config.linkUrl !== '' && config.linkUrl !== undefined} onChange={e => {
+                            updateOverlayConfig(positionKey, 'linkUrl', e.target.checked ? ' ' : '');
+                            if (e.target.checked) updateOverlayConfig(positionKey, 'linkText', ' ');
+                            else updateOverlayConfig(positionKey, 'linkText', '');
+                        }} />
+                        <span className="text-gray-800 select-none">Add Hyperlink</span>
+                    </label>
+                    <div className={`overflow-hidden transition-all duration-200 ${config.linkUrl !== '' && config.linkUrl !== undefined ? 'max-h-[140px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="space-y-2">
+                            <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]" placeholder="Link text (e.g. Click Here)" value={config.linkText} onChange={handleChange('linkText')} />
+                            <input type="url" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]" placeholder="URL (e.g. https://...)" value={config.linkUrl} onChange={handleChange('linkUrl')} />
+                        </div>
                     </div>
                 </div>
 
@@ -107,6 +125,7 @@ const buildSummary = (config) => {
     if (!config.enabled) return null;
     const parts = [];
     if (config.text && config.text.trim()) parts.push('Text');
+    if (config.linkUrl && config.linkUrl.trim()) parts.push('Link');
     if (config.html && config.html.trim()) parts.push('HTML');
     if (config.logo) parts.push('Logo');
     if (config.doi && config.doi.trim()) parts.push('DOI');
@@ -128,6 +147,7 @@ const getStampItems = (config) => {
     const items = [];
     if (config.logo && config.logo !== 'pending') items.push({ type: 'logo', value: config.logo });
     if (config.text && config.text.trim()) items.push({ type: 'text', value: config.text.trim() });
+    if (config.linkUrl && config.linkUrl.trim() && config.linkText && config.linkText.trim()) items.push({ type: 'html', value: `<a href="${config.linkUrl.trim()}" style="color:blue;text-decoration:underline;" target="_blank">${config.linkText.trim()}</a>` });
     if (config.doi && config.doi.trim()) items.push({ type: 'doi', value: `doi: ${config.doi.trim().startsWith('http') ? config.doi.trim() : 'https://doi.org/' + config.doi.trim()}` });
     if (config.date) items.push({ type: 'text', value: `Date Generated: ${formatDate()}` });
     if (config.html && config.html.trim()) items.push({ type: 'html', value: config.html.trim() });
@@ -266,7 +286,7 @@ const ExistingPagesTab = () => {
                                 onClick={() => handleZoneClick('leftMargin')}
                                 className={`${zoneBaseClass} ${getZoneStyle('leftMargin')}`}
                                 style={{ top: `calc(${MARGIN} + ${ZONE_H})`, bottom: `calc(${MARGIN} + ${ZONE_H})`, left: MARGIN, width: ZONE_W }}
-                                title="Click to configure Left Margin stamp"
+                                title="Click to configure Left Side stamp"
                             >
                                 <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
                                     {overlayConfig.leftMargin.enabled
@@ -281,7 +301,7 @@ const ExistingPagesTab = () => {
                                 onClick={() => handleZoneClick('rightMargin')}
                                 className={`${zoneBaseClass} ${getZoneStyle('rightMargin')}`}
                                 style={{ top: `calc(${MARGIN} + ${ZONE_H})`, bottom: `calc(${MARGIN} + ${ZONE_H})`, right: MARGIN, width: ZONE_W }}
-                                title="Click to configure Right Margin stamp"
+                                title="Click to configure Right Side stamp"
                             >
                                 <div style={{ writingMode: 'vertical-rl' }}>
                                     {overlayConfig.rightMargin.enabled

@@ -7,7 +7,7 @@ import axios from 'axios';
 const MainPortal = () => {
     const {
         publisherId, setPublisherId, jcode, setJcode,
-        currentTemplateKey, setCurrentTemplateKey, templatesState, getResolvedHtmlForSave, overlayConfig,
+        currentTemplateKey, setCurrentTemplateKey, templatesState, overlayConfig,
         templateConfig, updateShortcode, updateHtmlTemplate, updateOverlayConfig
     } = useTemplateContext();
 
@@ -28,44 +28,16 @@ const MainPortal = () => {
         }
 
         try {
-            // 1. Load Template Defaults
-            const templatePromise = axios.get(
-                `http://localhost:8080/api/v1/template/load?publisherId=${encodeURIComponent(publisherId)}&jcode=${encodeURIComponent(jcode)}`
-            ).catch(e => null); // Catch if template doesn't exist but config does
-
-            // 2. Load Overlay Configuration
+            // 1. Load Overlay Configuration
             const configPromise = axios.get(
-                `http://localhost:8080/api/v1/config/load?publisherId=${encodeURIComponent(publisherId)}&jcode=${encodeURIComponent(jcode)}`
+                `http://localhost:8080/api/v1/configs/${encodeURIComponent(publisherId)}/${encodeURIComponent(jcode)}`
             ).catch(e => null);
 
-            const [templateRes, configRes] = await Promise.all([templatePromise, configPromise]);
+            const [configRes] = await Promise.all([configPromise]);
 
-            if (!templateRes?.data && !configRes?.data) {
-                showToast('No saved configuration or template found for this Publisher/Jcode.', true);
+            if (!configRes?.data) {
+                showToast('No saved configuration found for this Publisher/Jcode.', true);
                 return;
-            }
-
-            // Apply Template State
-            if (templateRes?.data) {
-                const data = templateRes.data;
-                if (data.templateName && templatesState[data.templateName]) {
-                    setCurrentTemplateKey(data.templateName);
-                }
-
-                if (data.shortcodes) {
-                    Object.keys(data.shortcodes).forEach(key => {
-                        const templateKey = data.templateName || currentTemplateKey;
-                        if (templatesState[templateKey]?.shortcodes[key]) {
-                            updateShortcode(templateKey, key, data.shortcodes[key]);
-                        }
-                    });
-                }
-
-                if (data.htmlTemplate) {
-                    // Clean up any historically saved contenteditable wrappers injected by accident
-                    let cleanHtml = data.htmlTemplate.replace(/<span contenteditable="true" style="outline: none;">(\{\{[a-zA-Z_]+\}\})<\/span>/g, '$1');
-                    updateHtmlTemplate(data.templateName || currentTemplateKey, cleanHtml);
-                }
             }
 
             // Apply Configuration State
@@ -73,8 +45,11 @@ const MainPortal = () => {
                 const positions = configRes.data.positions;
 
                 // Rehydrate 'enableAddNewPage'
-                if (positions['CUSTOM'] && positions['CUSTOM'].addNewPage) {
+                if (positions['NEW_PAGE']) {
                     setEnableAddNewPage(true);
+                    if (positions['NEW_PAGE'].templateName) {
+                        setCurrentTemplateKey(positions['NEW_PAGE'].templateName);
+                    }
                 } else {
                     setEnableAddNewPage(false);
                 }
@@ -104,12 +79,12 @@ const MainPortal = () => {
                         updateOverlayConfig(frontendPosKey, 'enabled', true);
                         updateOverlayConfig(frontendPosKey, 'includeCurrentUser', conf.includeCurrentUser || false);
 
-                        if (conf.logo && conf.logo.base64) updateOverlayConfig(frontendPosKey, 'logo', conf.logo.base64);
-                        if (conf.text && conf.text.content) updateOverlayConfig(frontendPosKey, 'text', conf.text.content);
-                        if (conf.html && conf.html.content) updateOverlayConfig(frontendPosKey, 'html', conf.html.content);
-                        if (conf.doi && conf.doi.value) updateOverlayConfig(frontendPosKey, 'doi', conf.doi.value);
-                        if (conf.date && conf.date.enabled) updateOverlayConfig(frontendPosKey, 'date', true);
-                        if (conf.ad && conf.ad.link) updateOverlayConfig(frontendPosKey, 'ad', conf.ad.link);
+                        if (conf.logo) updateOverlayConfig(frontendPosKey, 'logo', conf.logo);
+                        if (conf.text) updateOverlayConfig(frontendPosKey, 'text', conf.text);
+                        if (conf.html) updateOverlayConfig(frontendPosKey, 'html', conf.html);
+                        if (conf.doi) updateOverlayConfig(frontendPosKey, 'doi', conf.doi);
+                        if (conf.includeDate) updateOverlayConfig(frontendPosKey, 'date', true);
+                        if (conf.ad) updateOverlayConfig(frontendPosKey, 'ad', conf.ad);
                     }
                 });
             }
@@ -121,44 +96,7 @@ const MainPortal = () => {
         }
     };
 
-    const handleSaveTemplate = async () => {
-        if (!publisherId || !jcode) {
-            showToast('Please fill in Publisher ID and Jcode first.', true);
-            return;
-        }
 
-        const template = templatesState[currentTemplateKey];
-        const shortcodesToSave = {};
-
-        if (template.shortcodes) {
-            Object.keys(template.shortcodes).forEach(key => {
-                shortcodesToSave[key] = template.shortcodes[key].value !== undefined
-                    ? template.shortcodes[key].value
-                    : template.shortcodes[key].default;
-            });
-        }
-
-        const payload = {
-            publisherId: publisherId,
-            jcode: jcode,
-            templateName: currentTemplateKey,
-            shortcodes: shortcodesToSave,
-            htmlTemplate: template.htmlTemplate,
-            resolvedHtml: getResolvedHtmlForSave()
-        };
-
-        try {
-            const response = await axios.post('http://localhost:8080/api/v1/template/save', payload);
-            if (response.data.success) {
-                showToast('Template saved successfully!');
-            } else {
-                showToast('Failed to save template: ' + response.data.message, true);
-            }
-        } catch (error) {
-            console.error('Error saving template:', error);
-            showToast('Failed to save template. Is the server running?', true);
-        }
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -172,15 +110,15 @@ const MainPortal = () => {
             const positions = {};
 
             if (enableAddNewPage) {
-                positions['CUSTOM'] = {
+                positions['NEW_PAGE'] = {
                     alignment: 'CENTER',
-                    addNewPage: true,
                     includeCurrentUser: false,
                     includeArticleTitle: templateConfig.includeArticleTitle,
                     includeAuthors: templateConfig.includeAuthors,
                     includeDoi: templateConfig.includeDoi,
                     includeDate: templateConfig.includeDate,
-                    html: { content: getResolvedHtmlForSave() }
+                    templateName: currentTemplateKey,
+                    html: templateConfig.customHtml || ""
                 };
             }
 
@@ -192,17 +130,21 @@ const MainPortal = () => {
                     if (pos === 'leftMargin') positionKey = 'LEFT_MARGIN';
                     if (pos === 'rightMargin') positionKey = 'RIGHT_MARGIN';
 
-                    positions[positionKey] = {
+                    const posConfig = {
                         alignment: 'CENTER',
-                        addNewPage: false,
-                        includeCurrentUser: conf.includeCurrentUser,
-                        logo: conf.logo ? { base64: conf.logo, mimeType: 'image/png' } : null,
-                        text: conf.text ? { content: conf.text } : null,
-                        html: conf.html ? { content: conf.html } : null,
-                        doi: conf.doi ? { value: conf.doi } : null,
-                        date: conf.date ? { enabled: true } : null,
-                        ad: conf.ad ? { link: conf.ad } : null
+                        includeCurrentUser: conf.includeCurrentUser
                     };
+                    if (conf.logo) {
+                        posConfig.logo = conf.logo;
+                        posConfig.logoMimeType = 'image/png';
+                    }
+                    if (conf.text) posConfig.text = conf.text;
+                    if (conf.html) posConfig.html = conf.html;
+                    if (conf.doi) posConfig.doi = conf.doi;
+                    if (conf.date) posConfig.includeDate = true;
+                    if (conf.ad) posConfig.ad = conf.ad;
+                    
+                    positions[positionKey] = posConfig;
                 }
             });
 
@@ -212,7 +154,7 @@ const MainPortal = () => {
                 positions
             };
 
-            const response = await axios.post('http://localhost:8080/api/v1/config/save', payload);
+            const response = await axios.post('http://localhost:8080/api/v1/configs', payload);
             if (response.data.success) {
                 showToast('Configuration saved successfully!');
             } else {
@@ -293,7 +235,7 @@ const MainPortal = () => {
 
                             <div className="px-7 pb-7 pt-2">
                                 {activeTab === 'addNewPage' && (
-                                    <TemplateTab enableAddNewPage={enableAddNewPage} setEnableAddNewPage={setEnableAddNewPage} handleSaveTemplate={handleSaveTemplate} />
+                                    <TemplateTab enableAddNewPage={enableAddNewPage} setEnableAddNewPage={setEnableAddNewPage} />
                                 )}
                                 {activeTab === 'editExisting' && (
                                     <ExistingPagesTab />

@@ -67,64 +67,13 @@ export const TemplateProvider = ({ children }) => {
         setTemplateConfig({ logo: null, includeDate: true, includeDoi: true, includeArticleTitle: true, includeAuthors: true });
     };
 
-    // Replace shortcodes into the HTML template to get the resolved raw HTML
-    const getResolvedHtmlForSave = () => {
-        const template = templatesState[currentTemplateKey];
-        let html = template.htmlTemplate;
-        const codes = template.shortcodes || {};
-
-        Object.keys(codes).forEach(key => {
-            if (key === 'LOGO_TEXT' && templateConfig.logo) {
-                // Handled below
-                return;
-            }
-
-            const sc = codes[key];
-            const val = sc.value !== undefined ? sc.value : sc.default;
-            const regex = new RegExp('\\\\{\\\\{' + key + '\\\\}\\\\}', 'g');
-            html = html.replace(regex, val);
-        });
-
-        // Logo Replacement
-        if (templateConfig.logo) {
-            const imgHtml = `<img src="data:image/png;base64,${templateConfig.logo}" style="max-height: 60px; object-fit: contain;" alt="Logo" />`;
-            html = html.replace(/<h1[^>]*>\{\{LOGO_TEXT\}\}<\/h1>/g, imgHtml); // Replace full h1 if present
-            html = html.replace(/\{\{LOGO_TEXT\}\}/g, imgHtml); // Fallback
-        }
-
-        // Date replacement
-        if (templateConfig.includeDate) {
-            const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December'];
-            const d = new Date();
-            const currentDateStr = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-            html = html.replace(/\{\{DATE\}\}/g, currentDateStr);
-        } else {
-            // Remove element containing Date
-            html = html.replace(/<[^>]*class="date-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
-            html = html.replace(/\{\{DATE\}\}/g, '');
-        }
-
-        // Remove metadata placeholder blocks based on boolean flags
-        if (!templateConfig.includeArticleTitle) {
-            html = html.replace(/<[^>]*class="article-title-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
-        }
-        if (!templateConfig.includeAuthors) {
-            html = html.replace(/<[^>]*class="authors-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
-        }
-        if (!templateConfig.includeDoi) {
-            html = html.replace(/<[^>]*class="doi-block"[^>]*>[\s\S]*?<\/[^>]+>/g, '');
-        }
-
-        return html;
-    };
 
     // Shared state for the Existing Pages overlays
     const [overlayConfig, setOverlayConfig] = useState({
-        header: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '' },
-        footer: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '' },
-        leftMargin: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '' },
-        rightMargin: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '' }
+        header: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '', linkUrl: '', linkText: '' },
+        footer: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '', linkUrl: '', linkText: '' },
+        leftMargin: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '', linkUrl: '', linkText: '' },
+        rightMargin: { enabled: false, includeCurrentUser: false, logo: null, text: '', html: '', doi: '', date: false, ad: '', linkUrl: '', linkText: '' }
     });
 
     const updateOverlayConfig = (position, field, value) => {
@@ -145,7 +94,6 @@ export const TemplateProvider = ({ children }) => {
             templatesState, currentTemplateData, setTemplatesState,
             templateConfig, setTemplateConfig,
             updateShortcode, updateHtmlTemplate, resetToDefault,
-            getResolvedHtmlForSave,
             overlayConfig, updateOverlayConfig
         }}>
             {children}
