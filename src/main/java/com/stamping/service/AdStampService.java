@@ -50,7 +50,7 @@ public class AdStampService {
 
         String pdfAdOneHtml = null;
 
-        if (adResponse.getSection() != null) {
+        if (adResponse != null && adResponse.getSection() != null) {
             for (var section : adResponse.getSection()) {
                 if (section.getAdLocation() != null) {
                     for (var location : section.getAdLocation()) {
@@ -124,6 +124,10 @@ public class AdStampService {
     }
 
     public String processHtmlContent(String htmlContent) {
+        return processHtmlContent(htmlContent, null);
+    }
+
+    public String processHtmlContent(String htmlContent, String legacyDomain) {
         // First, extract out the actual 'url' parameter if it's an adclick link so the
         // PDF links directly
         java.util.regex.Pattern p = java.util.regex.Pattern
@@ -142,8 +146,20 @@ public class AdStampService {
         m.appendTail(sb);
         htmlContent = sb.toString();
 
-        // Fix relative paths for images and other links
-        String baseUrl = "https://hwmaint.genome.cshlp.org/adsystem/";
+        // Fix relative paths for images and other links using legacyDomain if provided
+        String baseUrl;
+        if (legacyDomain != null && !legacyDomain.isBlank()) {
+            String domain = legacyDomain.trim();
+            if (!domain.startsWith("http")) {
+                domain = "https://" + domain;
+            }
+            if (!domain.endsWith("/")) {
+                domain = domain + "/";
+            }
+            baseUrl = domain + "adsystem/";
+        } else {
+            baseUrl = "https://hwmaint.genome.cshlp.org/adsystem/";
+        }
         htmlContent = htmlContent.replace("src=\"/", "src=\"" + baseUrl);
         htmlContent = htmlContent.replace("href=\"/", "href=\"" + baseUrl);
         return htmlContent;
@@ -156,6 +172,9 @@ public class AdStampService {
             pdfDoc.setDefaultPageSize(new com.itextpdf.kernel.geom.PageSize(pageSize));
 
             ConverterProperties props = new ConverterProperties();
+            com.itextpdf.layout.font.FontProvider fontProvider =
+                    new com.itextpdf.html2pdf.resolver.font.DefaultFontProvider(true, true, true);
+            props.setFontProvider(fontProvider);
             com.itextpdf.layout.Document document = HtmlConverter.convertToDocument(html, pdfDoc, props);
             document.close();
 

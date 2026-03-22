@@ -175,7 +175,7 @@ const ConfigForm = () => {
     const { id } = useParams();
     const isEdit = id && id !== 'new';
     const {
-        publishers, getConfigById, addConfig, updateConfig,
+        publishers, configs, getConfigById, addConfig, updateConfig,
         addPublisher, addJournalToPublisher,
     } = useConfigContext();
 
@@ -244,7 +244,13 @@ const ConfigForm = () => {
         if (isEdit) {
             result = await updateConfig(Number(id), configData);
         } else {
-            result = await addConfig(configData);
+            const existing = configs.find(c => c.pubId === pubId && c.jcode === jcode && !c.archived);
+            if (existing) {
+                showToast('A configuration for this publisher and journal already exists. Updating it instead.');
+                result = await updateConfig(existing.id, configData);
+            } else {
+                result = await addConfig(configData);
+            }
         }
 
         if (result?.success) {

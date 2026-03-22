@@ -14,10 +14,10 @@ export const TEMPLATES = {
     <p class="date-block" style="font-size: 15px; margin: 0; line-height: 1.3;">This information is current as of {{DATE}}.</p>
   </div>
   <div style="flex: 1; min-width: 300px; padding:50px;">
-    <h1 class="article-title-block" style="font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2; color: #999;">{{ARTICLE_TITLE}}</h1>
-    <p class="authors-block" style="font-size: 16px; line-height: 1.4; margin: 0 0 25px 0; color: #999;">{{AUTHORS}}</p>
+    <h1 class="article-title-block" style="font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2; color: black;">{{ARTICLE_TITLE}}</h1>
+    <p class="authors-block" style="font-size: 16px; line-height: 1.4; margin: 0 0 25px 0; color: black;">{{AUTHORS}}</p>
     <div style="font-size: 15px; line-height: 1.3;">
-      <p class="doi-block" style="margin: 0 0 4px 0; color: #999;">doi: {{DOI}}</p>
+      <p class="doi-block" style="margin: 0 0 4px 0; color: black;">doi: {{DOI}}</p>
       <div class="link-block" style="margin: 0 0 4px 0;"><a href="{{LINK_URL}}" style="color: blue; text-decoration: none;">{{LINK_TEXT}}</a></div>
     </div>
   </div>
@@ -110,32 +110,52 @@ export const TEMPLATES = {
 <html>
 <head><meta charset="UTF-8"/></head>
 <body style="margin: 50px; font-family: Verdana, Arial, Helvetica, sans-serif; color: #000;">
-  <div style="margin-bottom: 25px;" class="logo-wrapper">{{LOGO}}</div>
-  <h1 class="article-title-block" style="font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;">[Article Title]</h1>
-  <p class="authors-block" style="font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;">[Authors]</p>
-  <p class="doi-block" style="margin: 0 0 4px 0; font-size: 15px;">doi: <a href="#" style="color: blue; text-decoration: none;">[DOI]</a></p>
-  <div class="link-block" style="margin: 0 0 4px 0; font-size: 15px;"><a href="{{LINK_URL}}" style="color: blue; text-decoration: none;">{{LINK_TEXT}}</a></div>
-  <p style="margin: 4px 0; font-size: 13px;">[Copyright]</p>
-  <p style="margin: 4px 0; font-size: 13px;">ISSN: [ISSN]</p>
-  <p style="margin: 4px 0; font-size: 13px;">Article ID: [Article ID]</p>
-  <p style="margin: 8px 0; font-size: 13px; color: #555;">Date Generated: {{DATE}}</p>
-  <p style="margin: 4px 0; font-size: 13px; color: #555;">Downloaded By: [User]</p>
+  <div style="text-align: center;">
+    <div style="margin-bottom: 25px;" class="logo-wrapper">{{LOGO}}</div>
+    <h1 class="article-title-block" style="font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2; text-align: center;">{{Article Title}}</h1>
+    <p class="authors-block" style="font-size: 16px; line-height: 1.4; margin: 0 0 25px 0; text-align: center;">{{Authors}}</p>
+    <p class="doi-block" style="margin: 0 0 4px 0; font-size: 15px; text-align: center;">doi: <a href="#" style="color: blue; text-decoration: none;">{{DOI}}</a></p>
+    <div class="link-block" style="margin: 0 0 4px 0; font-size: 15px; text-align: center;"><a href="{{LINK_URL}}" style="color: blue; text-decoration: none;">{{LINK_TEXT}}</a></div>
+    <p style="margin: 4px 0; font-size: 13px; text-align: center;">{{Copyright}}</p>
+    <p style="margin: 4px 0; font-size: 13px; text-align: center;">ISSN: {{ISSN}}</p>
+    <p style="margin: 4px 0; font-size: 13px; text-align: center;">Article ID: {{Article ID}}</p>
+    <p style="margin: 8px 0; font-size: 13px; color: #555; text-align: center;">Date Generated: {{DATE}}</p>
+    <p style="margin: 4px 0; font-size: 13px; color: #555; text-align: center;">Downloaded By: {{User}}</p>
+  </div>
 </body>
 </html>`
   },
   simple_header: {
     name: 'Simple Header Stamp',
-    shortcodes: {
-      TITLE: { label: 'Title', placeholder: 'e.g. Published Online', default: '' },
-      SUBTITLE: { label: 'Subtitle', placeholder: 'e.g. Journal of Medicine', default: '' }
+    shortcodes: {},
+    defaultSection: {
+      enabled: true,
+      pagePosition: 'front',
+      logo: { enabled: false, value: null },
+      html: { enabled: false, value: '' },
+      text: { enabled: false, value: '' },
+      articleTitle: true,
+      articleAuthors: true,
+      articleDoi: true,
+      articleCopyright: false,
+      articleIssn: false,
+      articleId: false,
+      dateOfDownload: true,
+      downloadBy: false,
+      adsBanner: { enabled: false, value: '', legacyDomain: '' },
     },
     htmlTemplate: `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"/></head>
-<body style="margin: 40px; font-family: Verdana, Arial, Helvetica, sans-serif; text-align: center;">
-  <h1 style="font-size: 28px; color: #1a1918; margin-bottom: 8px;">{{TITLE}}</h1>
-  <p style="font-size: 18px; color: #555; margin-top: 0;">{{SUBTITLE}}</p>
-  <p style="font-size: 14px; color: #888; margin-top: 16px;">Date: {{DATE}}</p>
+<body style="margin: 40px; font-family: Verdana, Arial, Helvetica, sans-serif; color: #000;">
+  <div style="text-align: center;">
+    <div style="margin-bottom: 20px;" class="logo-wrapper">{{LOGO}}</div>
+    <h1 class="article-title-block" style="font-size: 22px; font-weight: bold; margin: 0 0 10px 0; line-height: 1.3; text-align: center;">[Article Title]</h1>
+    <p class="authors-block" style="font-size: 15px; color: #444; margin: 0 0 10px 0; text-align: center;">[Authors]</p>
+    <p class="doi-block" style="font-size: 13px; margin: 0 0 6px 0; text-align: center;">doi: <a href="#" style="color: blue; text-decoration: none;">[DOI]</a></p>
+    <div class="link-block" style="font-size: 13px; margin: 0 0 6px 0; text-align: center;"><a href="{{LINK_URL}}" style="color: blue; text-decoration: none;">{{LINK_TEXT}}</a></div>
+    <p class="date-block" style="font-size: 13px; color: #888; margin-top: 16px; text-align: center;">{{DATE}}</p>
+  </div>
 </body>
 </html>`
   },

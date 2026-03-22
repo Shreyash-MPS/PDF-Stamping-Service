@@ -16,10 +16,10 @@ public class StampRequest {
     @Builder.Default
     private StampPosition position = StampPosition.CENTER;
 
-    /** Custom X coordinate (used when position = CUSTOM) */
+    /** Custom X coordinate */
     private Float x;
 
-    /** Custom Y coordinate (used when position = CUSTOM) */
+    /** Custom Y coordinate */
     private Float y;
 
     /** Opacity from 0.0 (fully transparent) to 1.0 (fully opaque) */
@@ -30,7 +30,7 @@ public class StampRequest {
     @Builder.Default
     private float rotation = 0f;
 
-    /** Scale factor for image/HTML stamps */
+    /** Scale factor for HTML stamps */
     @Builder.Default
     private float scale = 1.0f;
 
@@ -41,20 +41,7 @@ public class StampRequest {
     @Builder.Default
     private String pages = "ALL";
 
-    // --- Text-specific fields ---
-
-    /** The text content to stamp (only for TEXT type) */
-    private String text;
-
-    /** Font size in points */
-    @Builder.Default
-    private float fontSize = 14f;
-
-    /** Font color as hex string, e.g. "#FF0000" */
-    @Builder.Default
-    private String fontColor = "#000000";
-
-    /** Width of the stamp area (for HTML stamps or text wrapping) */
+    /** Width of the stamp area */
     private Float stampWidth;
 
     /** Height of the stamp area */

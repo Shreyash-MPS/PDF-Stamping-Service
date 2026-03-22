@@ -1,17 +1,18 @@
 package com.stamping.service;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfReader;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.stamping.model.MetadataFrontPageRequest;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.util.Arrays;
-
-import static org.junit.jupiter.api.Assertions.*;
+import com.itextpdf.kernel.geom.PageSize;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfReader;
+import com.itextpdf.kernel.pdf.PdfWriter;
 
 class MetadataFrontPageServiceTest {
 
@@ -32,33 +33,26 @@ class MetadataFrontPageServiceTest {
     }
 
     @Test
-    void testPrependMetadataPage_Success() throws Exception {
-        byte[] inputPdf = createMinimalPdf();
+    void testRenderHtmlToPdf_ProducesValidPdf() {
+        String html = "<html><body><p>Test content</p></body></html>";
+        byte[] result = metadataFrontPageService.renderHtmlToPdf(html, PageSize.A4);
 
-        MetadataFrontPageRequest request = MetadataFrontPageRequest.builder()
-                .logoText("AJNR")
-                .articleTitle("Consensus Statement")
-                .authors("John Doe, Jane Doe")
-                .addCurrentDate(true)
-                .addDoi(true)
-                .doi("10.1234/test")
-                .citationText("J Testing 2026")
-                .build();
+        assertNotNull(result);
+        assertTrue(result.length > 0, "Rendered PDF should not be empty");
+    }
 
-        // Check input length
-        PdfDocument originalDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(inputPdf)));
-        int originalPages = originalDoc.getNumberOfPages(); // Should be 1
-        originalDoc.close();
+    @Test
+    void testPrependPdf_AddsExtraPage() throws Exception {
+        byte[] originalPdf = createMinimalPdf();
+        byte[] prependPdf = createMinimalPdf();
 
-        // Execute
-        byte[] result = metadataFrontPageService.prependMetadataPage(inputPdf, request);
+        byte[] result = metadataFrontPageService.prependPdf(originalPdf, prependPdf);
 
-        // Verify output length
         PdfDocument resultDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(result)));
-        int resultPages = resultDoc.getNumberOfPages(); // Should be original + metadata page (1 + 1 = 2)
+        int resultPages = resultDoc.getNumberOfPages();
         resultDoc.close();
 
-        assertEquals(originalPages + 1, resultPages, "Result PDF should have one extra metadata page");
-        assertTrue(result.length > inputPdf.length, "Output PDF byte size should be larger");
+        assertEquals(2, resultPages, "Merged PDF should have 2 pages");
+        assertTrue(result.length > originalPdf.length, "Output should be larger than input");
     }
 }

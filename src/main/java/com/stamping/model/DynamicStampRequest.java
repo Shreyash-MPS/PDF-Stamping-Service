@@ -29,13 +29,20 @@ public class DynamicStampRequest {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Configuration {
         private String alignment;
-        private boolean includeCurrentUser;
-        private boolean includeArticleTitle;
-        private boolean includeAuthors;
-        private boolean includeDoi;
-        private boolean includeDate;
+        private Boolean includeCurrentUser;
+        private Boolean includeArticleTitle;
+        private Boolean includeAuthors;
+        private Boolean includeDoi;
+        private Boolean includeDate;
+        private Boolean includeCopyright;
+        private Boolean includeIssn;
+        private Boolean includeArticleId;
+
+        // NEW_PAGE position: where to insert the page ("front" or "back")
+        private String pagePosition;
 
         // Metadata fields (populated by Drupal at stamp time for NEW_PAGE position)
         private String articleTitle;
@@ -51,7 +58,8 @@ public class DynamicStampRequest {
         private String text;
         private String html;
         private String doi;
-        private String ad;
+        private Boolean adsEnabled; // When true, BAM ads URL is built at runtime from publisherId + jcode
+        private String legacyDomain; // Legacy domain for resolving relative ad paths (e.g. "hwmaint.genome.cshlp.org")
         
         // Link fields
         private String linkUrl;

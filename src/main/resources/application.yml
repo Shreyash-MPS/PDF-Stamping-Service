@@ -14,6 +14,12 @@ stamping:
   default-opacity: 0.8
 
 logging:
+  pattern:
+    console: "%d{HH:mm:ss} %highlight(%-5level) %cyan(%-40.40logger{39}) : %msg%n"
   level:
+    root: WARN
     com.stamping: INFO
+    com.stamping.service.AdFetchService: DEBUG
+    org.springframework.web: WARN
     org.apache.pdfbox: WARN
+    com.itextpdf: WARN

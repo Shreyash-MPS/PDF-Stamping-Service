@@ -361,17 +361,11 @@ const StampSectionPanel = ({ section, onChange, sectionKey, templateName, onTemp
                                 />
                                 <span className="text-gray-700 select-none">Ads Banner</span>
                             </label>
-                            <div className={`overflow-hidden transition-all duration-200 ${section.adsBanner?.enabled ? 'max-h-40 opacity-100 mt-1.5 ml-6.5' : 'max-h-0 opacity-0'}`}>
-                                <div className="space-y-2">
-                                    <input type="text" className={inputClass} placeholder="Ad banner URL or content"
-                                        value={section.adsBanner?.value ?? ''}
-                                        onChange={e => update('adsBanner', { ...section.adsBanner, enabled: true, value: e.target.value })}
-                                    />
-                                    <input type="text" className={inputClass} placeholder="Legacy domain (e.g. https://legacy.example.com)"
-                                        value={section.adsBanner?.legacyDomain ?? ''}
-                                        onChange={e => update('adsBanner', { ...section.adsBanner, enabled: true, legacyDomain: e.target.value })}
-                                    />
-                                </div>
+                            <div className={`overflow-hidden transition-all duration-200 ${section.adsBanner?.enabled ? 'max-h-20 opacity-100 mt-1.5 ml-6.5' : 'max-h-0 opacity-0'}`}>
+                                <input type="text" className={inputClass} placeholder="Legacy domain (e.g. https://legacy.example.com)"
+                                    value={section.adsBanner?.legacyDomain ?? ''}
+                                    onChange={e => update('adsBanner', { ...section.adsBanner, enabled: true, legacyDomain: e.target.value })}
+                                />
                             </div>
                         </div>
                     </div>

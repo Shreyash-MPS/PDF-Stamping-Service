@@ -62,6 +62,11 @@ public class HtmlStamper implements Stamper {
         try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
             ConverterProperties props = new ConverterProperties();
 
+            // Font provider that embeds all fonts (including standard ones) for PAC compliance
+            com.itextpdf.layout.font.FontProvider fontProvider =
+                    new com.itextpdf.html2pdf.resolver.font.DefaultFontProvider(true, true, true);
+            props.setFontProvider(fontProvider);
+
             if (request.getStampWidth() != null && request.getStampHeight() != null) {
                 com.itextpdf.kernel.pdf.PdfWriter writer = new com.itextpdf.kernel.pdf.PdfWriter(os);
                 com.itextpdf.kernel.pdf.PdfDocument pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);

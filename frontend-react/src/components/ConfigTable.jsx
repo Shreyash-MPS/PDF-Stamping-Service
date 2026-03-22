@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfigContext } from '../context/ConfigContext';
-import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight, Filter, Undo2, X } from 'lucide-react';
+import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight, Filter, Undo2, X, Download, Loader2 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
 
@@ -12,6 +12,7 @@ const ConfigTable = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [filterPubId, setFilterPubId] = useState('');
     const [toast, setToast] = useState(null);
+    const [downloading, setDownloading] = useState(null);
     const toastTimer = useRef(null);
 
     const rows = (() => {
@@ -53,6 +54,28 @@ const ConfigTable = () => {
     const dismissToast = () => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast(null);
+    };
+
+    const handleDownloadDemo = async (row) => {
+        const id = row.id;
+        setDownloading(id);
+        try {
+            const response = await fetch(`/api/v1/stamp/demo-pdf/${row.pubId}/${row.jcode}`);
+            if (!response.ok) throw new Error('Failed to generate demo PDF');
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `demo_${row.pubId}_${row.jcode}_stamped.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Failed to download demo PDF: ' + err.message);
+        } finally {
+            setDownloading(null);
+        }
     };
 
     useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
@@ -111,7 +134,7 @@ const ConfigTable = () => {
                                     <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-16">S.No</th>
                                     <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Publisher Name</th>
                                     <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Journal Name</th>
-                                    <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-32 text-center">Actions</th>
+                                    <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-44 text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -122,6 +145,14 @@ const ConfigTable = () => {
                                         <td className="px-5 py-3.5 text-sm text-gray-800">{row.jName}</td>
                                         <td className="px-5 py-3.5 text-center">
                                             <div className="inline-flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleDownloadDemo(row)}
+                                                    disabled={downloading === row.id}
+                                                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                                                    title="Download Sample PDF"
+                                                >
+                                                    {downloading === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                                </button>
                                                 <button
                                                     onClick={() => handleEdit(row.id)}
                                                     className="p-2 text-gray-500 hover:text-[#a81732] hover:bg-[#fdf2f4] rounded-md transition-colors cursor-pointer"

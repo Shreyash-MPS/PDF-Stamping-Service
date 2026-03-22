@@ -1,20 +1,32 @@
 package com.stamping.service;
 
-import com.stamping.model.DynamicStampRequest;
-import com.stamping.model.JournalMetadataRequest;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.stereotype.Service;
+
+import com.stamping.model.DynamicStampRequest;
+import com.stamping.model.JournalMetadataRequest;
+import com.stamping.model.ad.AdData;
+import com.stamping.model.ad.AdLocation;
+import com.stamping.model.ad.AdResponse;
+import com.stamping.model.ad.Section;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class TemplateService {
 
+    private final AdFetchService adFetchService;
+    private final AdStampService adStampService;
     private final Map<String, String> templates;
 
-    public TemplateService() {
+    public TemplateService(AdFetchService adFetchService, AdStampService adStampService) {
+        this.adFetchService = adFetchService;
+        this.adStampService = adStampService;
         templates = new HashMap<>();
 
         templates.put("journal_article", 
@@ -88,16 +100,18 @@ public class TemplateService {
                 "<html>\n" +
                 "<head><meta charset=\"UTF-8\"/></head>\n" +
                 "<body style=\"margin: 50px; font-family: Verdana, Arial, Helvetica, sans-serif; color: #000;\">\n" +
-                "  <div style=\"margin-bottom: 25px;\" class=\"logo-wrapper\">{{LOGO}}</div>\n" +
-                "  <h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">{{ARTICLE_TITLE}}</h1>\n" +
-                "  <p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">{{AUTHORS}}</p>\n" +
-                "  <p class=\"doi-block\" style=\"margin: 0 0 4px 0; font-size: 15px;\">doi: <a href=\"#\" style=\"color: blue; text-decoration: none;\">{{DOI}}</a></p>\n" +
-                "  <div class=\"link-block\" style=\"margin: 0 0 4px 0; font-size: 15px;\"><a href=\"{{LINK_URL}}\" style=\"color: blue; text-decoration: none;\">{{LINK_TEXT}}</a></div>\n" +
-                "  <p style=\"margin: 4px 0; font-size: 13px;\">{{COPYRIGHT}}</p>\n" +
-                "  <p style=\"margin: 4px 0; font-size: 13px;\">ISSN: {{ISSN}}</p>\n" +
-                "  <p style=\"margin: 4px 0; font-size: 13px;\">Article ID: {{ARTICLE_ID}}</p>\n" +
-                "  <p style=\"margin: 8px 0; font-size: 13px; color: #555;\">Date Generated: {{DATE}}</p>\n" +
-                "  <p style=\"margin: 4px 0; font-size: 13px; color: #555;\">Downloaded By: {{USER}}</p>\n" +
+                "  <div style=\"text-align: center;\">\n" +
+                "    <div style=\"margin-bottom: 25px;\" class=\"logo-wrapper\">{{LOGO}}</div>\n" +
+                "    <h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2; text-align: center;\">{{ARTICLE_TITLE}}</h1>\n" +
+                "    <p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0; text-align: center;\">{{AUTHORS}}</p>\n" +
+                "    <p class=\"doi-block\" style=\"margin: 0 0 4px 0; font-size: 15px; text-align: center;\">doi: <a href=\"{{DOI}}\" style=\"color: blue; text-decoration: none;\">{{DOI}}</a></p>\n" +
+                "    <div class=\"link-block\" style=\"margin: 0 0 4px 0; font-size: 15px; text-align: center;\"><a href=\"{{LINK_URL}}\" style=\"color: blue; text-decoration: none;\">{{LINK_TEXT}}</a></div>\n" +
+                "    <p style=\"margin: 4px 0; font-size: 13px; text-align: center;\">{{COPYRIGHT}}</p>\n" +
+                "    <p style=\"margin: 4px 0; font-size: 13px; text-align: center;\">ISSN: {{ISSN}}</p>\n" +
+                "    <p style=\"margin: 4px 0; font-size: 13px; text-align: center;\">Article ID: {{ARTICLE_ID}}</p>\n" +
+                "    <p style=\"margin: 8px 0; font-size: 13px; color: #555; text-align: center;\">Date Generated: {{DATE}}</p>\n" +
+                "    <p style=\"margin: 4px 0; font-size: 13px; color: #555; text-align: center;\">Downloaded By: {{USER}}</p>\n" +
+                "  </div>\n" +
                 "</body>\n" +
                 "</html>"
         );
@@ -106,10 +120,15 @@ public class TemplateService {
                 "<!DOCTYPE html>\n" +
                 "<html>\n" +
                 "<head><meta charset=\"UTF-8\"/></head>\n" +
-                "<body style=\"margin: 40px; font-family: Verdana, Arial, Helvetica, sans-serif; text-align: center;\">\n" +
-                "  <h1 style=\"font-size: 28px; color: #1a1918; margin-bottom: 8px;\">{{TITLE}}</h1>\n" +
-                "  <p style=\"font-size: 18px; color: #555; margin-top: 0;\">{{SUBTITLE}}</p>\n" +
-                "  <p style=\"font-size: 14px; color: #888; margin-top: 16px;\">Date: {{DATE}}</p>\n" +
+                "<body style=\"margin: 40px; font-family: Verdana, Arial, Helvetica, sans-serif; color: #000;\">\n" +
+                "  <div style=\"text-align: center;\">\n" +
+                "    <div style=\"margin-bottom: 20px;\" class=\"logo-wrapper\">{{LOGO}}</div>\n" +
+                "    <h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 10px 0; line-height: 1.3; text-align: center;\">{{ARTICLE_TITLE}}</h1>\n" +
+                "    <p class=\"authors-block\" style=\"font-size: 15px; color: #444; margin: 0 0 10px 0; text-align: center;\">{{AUTHORS}}</p>\n" +
+                "    <p class=\"doi-block\" style=\"font-size: 13px; margin: 0 0 6px 0; text-align: center;\">doi: <a href=\"{{DOI}}\" style=\"color: blue; text-decoration: none;\">{{DOI}}</a></p>\n" +
+                "    <div class=\"link-block\" style=\"font-size: 13px; margin: 0 0 6px 0; text-align: center;\"><a href=\"{{LINK_URL}}\" style=\"color: blue; text-decoration: none;\">{{LINK_TEXT}}</a></div>\n" +
+                "    <p class=\"date-block\" style=\"font-size: 13px; color: #888; margin-top: 16px; text-align: center;\">{{DATE}}</p>\n" +
+                "  </div>\n" +
                 "</body>\n" +
                 "</html>"
         );
@@ -129,11 +148,22 @@ public class TemplateService {
     }
 
     public String renderTemplate(DynamicStampRequest.Configuration config, JournalMetadataRequest request) {
+        return renderTemplate(config, request, null);
+    }
+
+    public String renderTemplate(DynamicStampRequest.Configuration config, JournalMetadataRequest request,
+                                 PdfFontExtractor.FontInfo fontInfo) {
         String templateName = config.getTemplateName() != null ? config.getTemplateName() : "default_metadata";
         String template = templates.getOrDefault(templateName, templates.get("default_metadata"));
+
+        // Inject extracted PDF font into the template
+        if (fontInfo != null) {
+            PdfFontExtractor fontExtractor = new PdfFontExtractor();
+            template = fontExtractor.injectFontIntoHtml(template, fontInfo);
+        }
         
         // Date
-        if (config.isIncludeDate()) {
+        if (Boolean.TRUE.equals(config.getIncludeDate())) {
             String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
             template = template.replace("{{DATE}}", dateStr);
         } else {
@@ -151,7 +181,7 @@ public class TemplateService {
         }
 
         // Title
-        if (config.isIncludeArticleTitle() && request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
+        if (Boolean.TRUE.equals(config.getIncludeArticleTitle()) && request.getArticleTitle() != null && !request.getArticleTitle().isBlank()) {
             template = template.replace("{{ARTICLE_TITLE}}", request.getArticleTitle());
         } else {
             template = template.replace("{{ARTICLE_TITLE}}", "");
@@ -159,7 +189,7 @@ public class TemplateService {
         }
 
         // Authors
-        if (config.isIncludeAuthors() && request.getAuthors() != null && !request.getAuthors().isBlank()) {
+        if (Boolean.TRUE.equals(config.getIncludeAuthors()) && request.getAuthors() != null && !request.getAuthors().isBlank()) {
             template = template.replace("{{AUTHORS}}", request.getAuthors());
         } else {
             template = template.replace("{{AUTHORS}}", "");
@@ -167,7 +197,7 @@ public class TemplateService {
         }
 
         // DOI
-        if (config.isIncludeDoi() && request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
+        if (Boolean.TRUE.equals(config.getIncludeDoi()) && request.getDoiValue() != null && !request.getDoiValue().isBlank()) {
             String doiUrl = request.getDoiValue().startsWith("http") ? request.getDoiValue() : "https://doi.org/" + request.getDoiValue();
             template = template.replace("{{DOI}}", doiUrl);
         } else {
@@ -189,7 +219,54 @@ public class TemplateService {
         template = template.replace("{{COPYRIGHT}}", request.getArticleCopyright() != null ? request.getArticleCopyright() : "");
         template = template.replace("{{ISSN}}", request.getArticleIssn() != null ? request.getArticleIssn() : "");
         template = template.replace("{{ARTICLE_ID}}", request.getArticleId() != null ? request.getArticleId() : "");
-        template = template.replace("{{USER}}", "");
+        if (Boolean.TRUE.equals(config.getIncludeCurrentUser()) && request.getDownloadedBy() != null && !request.getDownloadedBy().isBlank()) {
+            template = template.replace("{{USER}}", request.getDownloadedBy());
+        } else {
+            template = template.replace("{{USER}}", "");
+        }
+
+        // Ad Banner — fetch and inject if ads are enabled and template has the placeholder
+        // For NEW_PAGE templates, only use ads with position "pdf ad one"
+        if (template.contains("{{AD_BANNER}}")) {
+            String adHtml = "";
+            if (Boolean.TRUE.equals(config.getAdsEnabled())
+                    && request.getPublisherId() != null && !request.getPublisherId().isBlank()
+                    && request.getJcode() != null && !request.getJcode().isBlank()) {
+                String adUrl = "https://bam-ads-presenter.highwire.org/api/ads?publisherId="
+                        + request.getPublisherId() + "&jcode=" + request.getJcode() + "&sectionPath=xpdf";
+                AdResponse adResponse = adFetchService.fetchAds(adUrl);
+                if (adResponse != null && adResponse.getSection() != null) {
+                    outer:
+                    for (Section sec : adResponse.getSection()) {
+                        if (sec.getAdLocation() != null) {
+                            for (AdLocation location : sec.getAdLocation()) {
+                                // Filter to "pdf ad one" position only for NEW_PAGE template rendering
+                                if ("pdf ad one".equalsIgnoreCase(location.getPositionName())
+                                        && location.getAdData() != null) {
+                                    for (AdData ad : location.getAdData()) {
+                                        if (ad.getAdHtml() != null && !ad.getAdHtml().isEmpty()) {
+                                            adHtml = adStampService.processHtmlContent(ad.getAdHtml(), config.getLegacyDomain());
+                                            break outer;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (adHtml.isEmpty()) {
+                        log.warn("Ad response received but no 'pdf ad one' position found for pubId={}, jcode={}",
+                                request.getPublisherId(), request.getJcode());
+                    }
+                } else {
+                    log.warn("No ad response or empty sections for template ad banner (pubId={}, jcode={})",
+                            request.getPublisherId(), request.getJcode());
+                }
+            }
+            template = template.replace("{{AD_BANNER}}", adHtml);
+            if (adHtml.isEmpty()) {
+                template = template.replaceAll("<[^>]*class=\"ad-banner-block\"[^>]*>[\\s\\S]*?</[^>]+>", "");
+            }
+        }
 
         return template;
     }
