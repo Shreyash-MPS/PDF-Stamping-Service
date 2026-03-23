@@ -213,7 +213,7 @@ const ConfigForm = () => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sample_${pubId}_${jcode}.pdf`;
+            a.download = `demo_${pubId}_${jcode}.pdf`;
             document.body.appendChild(a);
             a.click();
             a.remove();

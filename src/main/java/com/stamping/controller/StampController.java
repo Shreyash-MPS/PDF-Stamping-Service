@@ -565,6 +565,21 @@ public class StampController {
                 throw new StampingException("pubId and jcode are required");
             }
 
+            // Strip unused "value" field from adsBanner in each section
+            for (String section : new String[]{"newPage", "header", "footer", "leftMargin", "rightMargin"}) {
+                Object sectionObj = rawConfig.get(section);
+                if (sectionObj instanceof java.util.Map) {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, Object> sectionMap = (java.util.Map<String, Object>) sectionObj;
+                    Object adsBannerObj = sectionMap.get("adsBanner");
+                    if (adsBannerObj instanceof java.util.Map) {
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Object> adsBanner = (java.util.Map<String, Object>) adsBannerObj;
+                        adsBanner.remove("value");
+                    }
+                }
+            }
+
             File configDir = new File("configs");
             if (!configDir.exists()) configDir.mkdirs();
 
