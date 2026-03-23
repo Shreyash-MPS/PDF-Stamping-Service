@@ -56,8 +56,31 @@ public class StampController {
      */
     @PostMapping(value = "/stamp/journal-metadata", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<byte[]> processJournalMetadata(@RequestBody com.stamping.model.JournalMetadataRequest request) {
+        java.io.File demoTempFile = null;
         try {
             request.applyDemoDefaults();
+
+            // In demo mode, auto-fill positions from saved config and create a blank PDF if needed
+            if (request.isDemoMode()) {
+                if (request.getPositions() == null || request.getPositions().isEmpty()) {
+                    if (request.getPublisherId() != null && !request.getPublisherId().isBlank()
+                            && request.getJcode() != null && !request.getJcode().isBlank()) {
+                        com.stamping.model.JournalMetadataRequest demoReq =
+                                demoStampService.buildDemoRequest(request.getPublisherId(), request.getJcode());
+                        request.setPositions(demoReq.getPositions());
+                        log.info("  [DEMO] Auto-loaded positions from saved config for {}/{}",
+                                request.getPublisherId(), request.getJcode());
+                    }
+                }
+                if (request.getPdfFilePath() == null || request.getPdfFilePath().isBlank()) {
+                    byte[] blankPdf = demoStampService.createBlankPdf();
+                    demoTempFile = java.io.File.createTempFile("demo_blank_", ".pdf");
+                    demoTempFile.deleteOnExit();
+                    Files.write(demoTempFile.toPath(), blankPdf);
+                    request.setPdfFilePath(demoTempFile.getAbsolutePath());
+                    log.info("  [DEMO] Created blank placeholder PDF: {}", demoTempFile.getAbsolutePath());
+                }
+            }
 
             long startTime = System.currentTimeMillis();
             log.info("==========================================================");
@@ -425,6 +448,10 @@ public class StampController {
             throw e;
         } catch (Exception e) {
             throw new StampingException("Failed to process journal metadata request: " + e.getMessage(), e);
+        } finally {
+            if (demoTempFile != null && demoTempFile.exists()) {
+                demoTempFile.delete();
+            }
         }
     }
 

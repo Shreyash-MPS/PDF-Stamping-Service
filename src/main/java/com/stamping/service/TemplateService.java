@@ -34,20 +34,22 @@ public class TemplateService {
                 "<html>\n" +
                 "<head><meta charset=\"UTF-8\"/></head>\n" +
                 "<body style=\"margin: 50px; font-family: Verdana, Arial, Helvetica, sans-serif; color: #000;\">\n" +
-                "<div style=\"display: flex; gap: 40px; align-items: flex-start; flex-wrap: nowrap;\">\n" +
-                "  <div style=\"flex: 0 0 30%; max-width: 30%; min-width: 150px; padding: 50px;\">\n" +
-                "    <div style=\"margin-bottom: 25px;\" class=\"logo-wrapper\">{{LOGO}}</div>\n" +
-                "    <p class=\"date-block\" style=\"font-size: 15px; margin: 0; line-height: 1.3;\">This information is current as of {{DATE}}.</p>\n" +
-                "  </div>\n" +
-                "  <div style=\"flex: 1; min-width: 300px; padding:50px;\">\n" +
-                "    <h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2; color: #999;\">{{ARTICLE_TITLE}}</h1>\n" +
-                "    <p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0; color: #999;\">{{AUTHORS}}</p>\n" +
-                "    <div style=\"font-size: 15px; line-height: 1.3;\">\n" +
-                "      <p class=\"doi-block\" style=\"margin: 0 0 4px 0; color: #999;\">doi: {{DOI}}</p>\n" +
-                "      <div class=\"link-block\" style=\"margin: 0 0 4px 0;\"><a href=\"{{LINK_URL}}\" style=\"color: blue; text-decoration: none;\">{{LINK_TEXT}}</a></div>\n" +
-                "    </div>\n" +
-                "  </div>\n" +
-                "</div>\n" +
+                "<table style=\"width: 100%; border-collapse: collapse;\">\n" +
+                "  <tr>\n" +
+                "    <td style=\"width: 30%; vertical-align: top; padding: 50px 40px 50px 50px;\">\n" +
+                "      <div style=\"margin-bottom: 25px;\" class=\"logo-wrapper\">{{LOGO}}</div>\n" +
+                "      <p class=\"date-block\" style=\"font-size: 15px; margin: 0; line-height: 1.3;\">This information is current as of {{DATE}}.</p>\n" +
+                "    </td>\n" +
+                "    <td style=\"vertical-align: top; padding: 50px 50px 50px 0;\">\n" +
+                "      <h1 class=\"article-title-block\" style=\"font-size: 22px; font-weight: bold; margin: 0 0 16px 0; line-height: 1.2;\">{{ARTICLE_TITLE}}</h1>\n" +
+                "      <p class=\"authors-block\" style=\"font-size: 16px; line-height: 1.4; margin: 0 0 25px 0;\">{{AUTHORS}}</p>\n" +
+                "      <div style=\"font-size: 15px; line-height: 1.3;\">\n" +
+                "        <p class=\"doi-block\" style=\"margin: 0 0 4px 0;\">doi: {{DOI}}</p>\n" +
+                "        <div class=\"link-block\" style=\"margin: 0 0 4px 0;\"><a href=\"{{LINK_URL}}\" style=\"color: blue; text-decoration: none;\">{{LINK_TEXT}}</a></div>\n" +
+                "      </div>\n" +
+                "    </td>\n" +
+                "  </tr>\n" +
+                "</table>\n" +
                 "</body>\n" +
                 "</html>"
         );
@@ -176,6 +178,9 @@ public class TemplateService {
         if (logoBase64 != null && !logoBase64.isBlank()) {
             String mime = config.getLogoMimeType() != null ? config.getLogoMimeType() : "image/png";
             template = template.replace("{{LOGO}}", "<img src=\"data:" + mime + ";base64," + logoBase64 + "\" style=\"max-width: 200px; display: block; margin-bottom: 16px;\" />");
+        } else if (request.isDemoMode()) {
+            // In demo mode, inject the HighWire logo SVG when no custom logo is provided
+            template = template.replace("{{LOGO}}", DemoStampService.getHighWireLogoSvg());
         } else {
             template = template.replace("{{LOGO}}", "");
         }

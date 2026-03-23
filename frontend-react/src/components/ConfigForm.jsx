@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useConfigContext, getDefaultConfig } from '../context/ConfigContext';
-import { ArrowLeft, Save, Eye, X, FilePlus, PanelTop, PanelBottom, PanelLeft, PanelRight } from 'lucide-react';
+import { ArrowLeft, Save, Eye, X, FilePlus, PanelTop, PanelBottom, PanelLeft, PanelRight, Download, Loader2 } from 'lucide-react';
 import { TEMPLATES, getCurrentDate } from '../models/templates';
 import stampingConfigData from '../data/stamping_config.json';
 import StampSectionPanel from './StampSectionPanel';
@@ -198,6 +198,32 @@ const ConfigForm = () => {
     const [isNewJournal, setIsNewJournal] = useState(false);
     const [toast, setToast] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+
+    const handleDownloadSample = async () => {
+        if (!pubId || !jcode) {
+            showToast('Save the configuration first to download a sample PDF.', true);
+            return;
+        }
+        setDownloading(true);
+        try {
+            const response = await fetch(`http://localhost:8080/api/v1/stamp/demo-pdf/${pubId}/${jcode}`);
+            if (!response.ok) throw new Error('Server returned ' + response.status);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sample_${pubId}_${jcode}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            showToast('Failed to download sample PDF: ' + err.message, true);
+        } finally {
+            setDownloading(false);
+        }
+    };
 
     useEffect(() => {
         if (isEdit) {
@@ -280,6 +306,12 @@ const ConfigForm = () => {
                         <button onClick={() => setShowPreview(true)} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-[#a81732] border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer">
                             <Eye className="w-4 h-4" />View Preview
                         </button>
+                        {isEdit && (
+                            <button onClick={handleDownloadSample} disabled={downloading} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-600 border border-blue-400 rounded-md hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait">
+                                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                Sample PDF
+                            </button>
+                        )}
                         <button onClick={handleSave} className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#a81732] rounded-md hover:bg-[#851227] transition-colors cursor-pointer">
                             <Save className="w-4 h-4" />{isEdit ? 'Update' : 'Save'}
                         </button>
@@ -364,6 +396,12 @@ const ConfigForm = () => {
                     <button onClick={() => setShowPreview(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-[#a81732] bg-white border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer">
                         <Eye className="w-4 h-4" />View Preview
                     </button>
+                    {isEdit && (
+                        <button onClick={handleDownloadSample} disabled={downloading} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-600 bg-white border border-blue-400 rounded-md hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait">
+                            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                            Sample PDF
+                        </button>
+                    )}
                     <button onClick={handleSave} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#a81732] rounded-md hover:bg-[#851227] transition-colors cursor-pointer">
                         <Save className="w-4 h-4" />{isEdit ? 'Update' : 'Save'} Configuration
                     </button>
