@@ -1,16 +1,17 @@
 package com.stamping.service;
 
-import com.stamping.model.ad.AdResponse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
-
-import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import org.springframework.web.client.RestTemplate;
+
+import com.stamping.model.ad.AdResponse;
 
 class AdFetchServiceTest {
 
@@ -20,13 +21,19 @@ class AdFetchServiceTest {
     @BeforeEach
     void setUp() {
         RestTemplate restTemplate = new RestTemplate();
-        adFetchService = new AdFetchService(new RestTemplateBuilder() {
-            @Override
-            public RestTemplate build() {
-                return restTemplate;
-            }
-        });
-        mockServer = MockRestServiceServer.createServer(restTemplate);
+        RestTemplateBuilder builder = new RestTemplateBuilder()
+                .requestFactory(() -> restTemplate.getRequestFactory());
+        adFetchService = new AdFetchService(builder);
+
+        // Get the actual RestTemplate the service built, via reflection
+        try {
+            java.lang.reflect.Field field = AdFetchService.class.getDeclaredField("restTemplate");
+            field.setAccessible(true);
+            RestTemplate actualTemplate = (RestTemplate) field.get(adFetchService);
+            mockServer = MockRestServiceServer.createServer(actualTemplate);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

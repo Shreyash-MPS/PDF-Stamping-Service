@@ -123,14 +123,14 @@ const PreviewModal = ({ sections, templateName, onTemplateChange, onClose }) => 
             * { margin:0; padding:0; box-sizing:border-box; }
             body { font-family: sans-serif; background: #d0d0d0; display:flex; flex-direction:column; align-items:center; padding:24px 0; }
             .a4-page { width: 595px; height: 842px; background: white; box-shadow: 0 2px 12px rgba(0,0,0,0.18); margin-bottom: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-            .stamp-header { border-bottom: 1px solid #ddd; padding: 10px 20px; font-size: 12px; background: #fafafa; flex-shrink: 0; }
+            .stamp-header { border-bottom: 1px solid #ddd; padding: 10px 20px; font-size: 12px; background: #fafafa; flex-shrink: 0; text-align: center; }
             .stamp-footer { border-top: 1px solid #ddd; padding: 10px 20px; font-size: 12px; background: #fafafa; flex-shrink: 0; }
             .body-row { display: flex; flex: 1; min-height: 0; }
             .stamp-margin { flex-shrink: 0; width: 32px; background: #fafafa; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #888; }
-            .stamp-margin span { writing-mode: vertical-rl; white-space: nowrap; }
-            .stamp-left { border-right: 1px solid #ddd; }
+            .stamp-margin span { writing-mode: vertical-rl; white-space: nowrap;}
+            .stamp-left { border-right: 1px solid #ddd; padding: 10px 20px; font-size: 12px; background: #fafafa; flex-shrink: 0; }
             .stamp-left span { transform: rotate(180deg); }
-            .stamp-right { border-left: 1px solid #ddd; }
+            .stamp-right { border-left: 1px solid #ddd; padding: 10px 20px; font-size: 12px; background: #fafafa; flex-shrink: 0; }
             .pdf-content { flex: 1; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 16px; background: repeating-linear-gradient(45deg, #fafafa, #fafafa 10px, #fff 10px, #fff 20px); min-width: 0; }
         </style></head><body>
             ${position === 'front' && newPageHtml ? `<div class="a4-page" style="padding:0;"><div style="flex:1;overflow:auto;">${newPageHtml}</div></div>` : ''}
