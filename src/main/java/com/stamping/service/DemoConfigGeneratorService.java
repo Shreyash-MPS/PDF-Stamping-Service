@@ -6,9 +6,11 @@ import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stamping.config.StampingProperties;
 import com.stamping.model.DynamicStampRequest;
 import com.stamping.model.JournalMetadataRequest;
 
@@ -18,18 +20,17 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * DEV-ONLY service — generates a demo JournalMetadataRequest JSON file
  * from a saved frontend configuration. Used for quick API testing.
- *
- * To remove before production: delete this file and DevController.java,
- * and remove the generateDemoTestConfig() call from StampController.saveConfig().
+ * Only active when spring.profiles.active includes "dev".
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Profile("dev")
 public class DemoConfigGeneratorService {
 
     private final ObjectMapper objectMapper;
+    private final StampingProperties properties;
 
-    private static final String TEST_REQUESTS_DIR = "test_requests";
     private static final String DEMO_PDF_PATH = "C:/stamp-test/1.pdf";
     private static final String DEMO_OUTPUT_PATH = "C:/stamp-test/1_stamp.pdf";
 
@@ -60,7 +61,7 @@ public class DemoConfigGeneratorService {
                     .positions(buildPositionsFromConfig(rawConfig))
                     .build();
 
-            File outputDir = new File(TEST_REQUESTS_DIR);
+            File outputDir = new File(properties.getTestRequestsDir());
             if (!outputDir.exists()) outputDir.mkdirs();
 
             String filename = "journal_metadata_" + pubId + "_" + jcode + ".json";

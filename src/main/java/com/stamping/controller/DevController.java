@@ -1,33 +1,34 @@
 package com.stamping.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stamping.model.StampResponse;
-import com.stamping.service.DemoConfigGeneratorService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
 
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stamping.model.StampResponse;
+import com.stamping.service.DemoConfigGeneratorService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * DEV-ONLY controller — exposes development/testing utilities.
- *
- * To remove before production:
- *   1. Delete this file (DevController.java)
- *   2. Delete DemoConfigGeneratorService.java
- *   3. Remove the generateDemoTestConfig() call from StampController.saveConfig()
- *   4. Remove the DemoConfigGeneratorService injection from StampController
+ * Only active when spring.profiles.active includes "dev".
  */
 @Slf4j
 @RestController
-@CrossOrigin(origins = "*")
 @RequestMapping("/api/v1/dev")
 @RequiredArgsConstructor
+@Profile("dev")
 public class DevController {
 
     private final DemoConfigGeneratorService demoConfigGeneratorService;

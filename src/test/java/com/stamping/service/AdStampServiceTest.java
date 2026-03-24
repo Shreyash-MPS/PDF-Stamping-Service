@@ -1,5 +1,23 @@
 package com.stamping.service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.Collections;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import org.mockito.MockitoAnnotations;
+
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.PdfWriter;
@@ -9,26 +27,14 @@ import com.stamping.model.ad.AdLocation;
 import com.stamping.model.ad.AdResponse;
 import com.stamping.model.ad.Section;
 import com.stamping.service.stamper.Stamper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 class AdStampServiceTest {
 
     @Mock
     private AdFetchService adFetchService;
+
+    @Mock
+    private MetadataFrontPageService metadataFrontPageService;
 
     @Mock
     private Stamper htmlStamper;
@@ -38,7 +44,7 @@ class AdStampServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        adStampService = new AdStampService(adFetchService, htmlStamper);
+        adStampService = new AdStampService(adFetchService, metadataFrontPageService, htmlStamper);
     }
 
     private byte[] createMinimalPdf() throws Exception {
@@ -120,21 +126,29 @@ class AdStampServiceTest {
         when(adFetchService.fetchAds(anyString())).thenReturn(adResponse);
 
         byte[] inputPdf = createMinimalPdf();
+        byte[] adPagePdf = createMinimalPdf(); // simulates the rendered ad page
+
+        // Stub the delegated calls to MetadataFrontPageService
+        when(metadataFrontPageService.renderHtmlToPdf(anyString(), any())).thenReturn(adPagePdf);
+
+        // Use a real MetadataFrontPageService for prependPdf to get a real merged PDF
+        MetadataFrontPageService realService = new MetadataFrontPageService();
+        byte[] mergedPdf = realService.prependPdf(inputPdf, adPagePdf);
+        when(metadataFrontPageService.prependPdf(any(byte[].class), any(byte[].class))).thenReturn(mergedPdf);
 
         // Check input length
-        PdfDocument originalDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(inputPdf)));
-        int originalPages = originalDoc.getNumberOfPages(); // Should be 1
-        originalDoc.close();
+        try (PdfDocument originalDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(inputPdf)))) {
+            int originalPages = originalDoc.getNumberOfPages(); // Should be 1
 
-        // Execute
-        byte[] result = adStampService.processAdJson(inputPdf, "http://example.com/ads.json", "all");
+            // Execute
+            byte[] result = adStampService.processAdJson(inputPdf, "http://example.com/ads.json", "all");
 
-        // Verify output length
-        PdfDocument resultDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(result)));
-        int resultPages = resultDoc.getNumberOfPages(); // Should be original + ad page (1 + 1 = 2)
-        resultDoc.close();
-
-        assertEquals(originalPages + 1, resultPages, "Result PDF should have one extra page");
+            // Verify output length
+            try (PdfDocument resultDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(result)))) {
+                int resultPages = resultDoc.getNumberOfPages();
+                assertEquals(originalPages + 1, resultPages, "Result PDF should have one extra page");
+            }
+        }
         verifyNoInteractions(htmlStamper); // Ensure header stamper wasn't called
     }
 }

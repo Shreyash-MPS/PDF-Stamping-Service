@@ -1,11 +1,10 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import publishersData from '../data/publishers.json';
+import { API_BASE } from '../config/api';
 
 const ConfigContext = createContext();
 
 export const useConfigContext = () => useContext(ConfigContext);
-
-const API_BASE = 'http://localhost:8080/api/v1';
 
 const DEFAULT_SECTION = {
     enabled: false,

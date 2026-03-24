@@ -11,6 +11,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stamping.config.StampingProperties;
 import com.stamping.model.ad.AdResponse;
 
 class AdFetchServiceTest {
@@ -23,7 +25,9 @@ class AdFetchServiceTest {
         RestTemplate restTemplate = new RestTemplate();
         RestTemplateBuilder builder = new RestTemplateBuilder()
                 .requestFactory(() -> restTemplate.getRequestFactory());
-        adFetchService = new AdFetchService(builder);
+        ObjectMapper objectMapper = new ObjectMapper();
+        StampingProperties properties = new StampingProperties();
+        adFetchService = new AdFetchService(builder, objectMapper, properties);
 
         // Get the actual RestTemplate the service built, via reflection
         try {

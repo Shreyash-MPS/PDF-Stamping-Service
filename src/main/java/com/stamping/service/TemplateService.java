@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.stamping.config.StampingProperties;
 import com.stamping.model.DynamicStampRequest;
 import com.stamping.model.JournalMetadataRequest;
 import com.stamping.model.ad.AdData;
@@ -22,11 +23,16 @@ public class TemplateService {
 
     private final AdFetchService adFetchService;
     private final AdStampService adStampService;
+    private final PdfFontExtractor pdfFontExtractor;
+    private final StampingProperties properties;
     private final Map<String, String> templates;
 
-    public TemplateService(AdFetchService adFetchService, AdStampService adStampService) {
+    public TemplateService(AdFetchService adFetchService, AdStampService adStampService,
+                           PdfFontExtractor pdfFontExtractor, StampingProperties properties) {
         this.adFetchService = adFetchService;
         this.adStampService = adStampService;
+        this.pdfFontExtractor = pdfFontExtractor;
+        this.properties = properties;
         templates = new HashMap<>();
 
         templates.put("journal_article", 
@@ -160,8 +166,7 @@ public class TemplateService {
 
         // Inject extracted PDF font into the template
         if (fontInfo != null) {
-            PdfFontExtractor fontExtractor = new PdfFontExtractor();
-            template = fontExtractor.injectFontIntoHtml(template, fontInfo);
+            template = pdfFontExtractor.injectFontIntoHtml(template, fontInfo);
         }
         
         // Date
@@ -237,8 +242,10 @@ public class TemplateService {
             if (Boolean.TRUE.equals(config.getAdsEnabled())
                     && request.getPublisherId() != null && !request.getPublisherId().isBlank()
                     && request.getJcode() != null && !request.getJcode().isBlank()) {
-                String adUrl = "https://bam-ads-presenter.highwire.org/api/ads?publisherId="
-                        + request.getPublisherId() + "&jcode=" + request.getJcode() + "&sectionPath=xpdf";
+                String adUrl = properties.getAds().getBaseUrl()
+                        + "?publisherId=" + request.getPublisherId()
+                        + "&jcode=" + request.getJcode()
+                        + "&sectionPath=" + properties.getAds().getSectionPath();
                 AdResponse adResponse = adFetchService.fetchAds(adUrl);
                 if (adResponse != null && adResponse.getSection() != null) {
                     outer:

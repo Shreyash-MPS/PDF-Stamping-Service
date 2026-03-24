@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfigContext } from '../context/ConfigContext';
+import { API_BASE } from '../config/api';
 import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight, Filter, Undo2, X, Download, Loader2 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -60,7 +61,7 @@ const ConfigTable = () => {
         const id = row.id;
         setDownloading(id);
         try {
-            const response = await fetch(`http://localhost:8080/api/v1/stamp/demo-pdf/${row.pubId}/${row.jcode}`);
+            const response = await fetch(`${API_BASE}/stamp/demo-pdf/${row.pubId}/${row.jcode}`);
             if (!response.ok) throw new Error('Failed to generate demo PDF');
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);

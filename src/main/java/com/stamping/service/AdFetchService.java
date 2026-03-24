@@ -2,9 +2,13 @@ package com.stamping.service;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stamping.config.StampingProperties;
 import com.stamping.model.ad.AdResponse;
 
 import lombok.extern.slf4j.Slf4j;
@@ -14,13 +18,18 @@ import lombok.extern.slf4j.Slf4j;
 public class AdFetchService {
 
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
-    public AdFetchService(RestTemplateBuilder restTemplateBuilder) {
-        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
-                new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(10_000);
-        factory.setReadTimeout(15_000);
+    public AdFetchService(RestTemplateBuilder restTemplateBuilder,
+                          ObjectMapper objectMapper,
+                          StampingProperties properties) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(properties.getAds().getConnectTimeout());
+        factory.setReadTimeout(properties.getAds().getReadTimeout());
         this.restTemplate = restTemplateBuilder.requestFactory(() -> factory).build();
+        // Configure a dedicated mapper that ignores unknown properties
+        this.objectMapper = objectMapper.copy()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
     /**
@@ -40,10 +49,7 @@ public class AdFetchService {
                 return null;
             }
 
-            // Parse manually so we can log the raw body on failure
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-            return mapper.readValue(raw.getBody(), AdResponse.class);
+            return objectMapper.readValue(raw.getBody(), AdResponse.class);
         } catch (Exception e) {
             log.error("Failed to fetch/parse ads from URL '{}': {}", url, e.getMessage(), e);
             return null;

@@ -1,32 +1,39 @@
 package com.stamping.service;
 
-import com.itextpdf.html2pdf.ConverterProperties;
-import com.itextpdf.html2pdf.HtmlConverter;
+import java.io.ByteArrayInputStream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfReader;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.kernel.utils.PdfMerger;
 import com.stamping.exception.StampingException;
 import com.stamping.model.StampPosition;
 import com.stamping.model.StampRequest;
 import com.stamping.model.StampType;
 import com.stamping.service.stamper.Stamper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 public class AdStampService {
 
     private final AdFetchService adFetchService;
+    private final MetadataFrontPageService metadataFrontPageService;
     private final Stamper htmlStamper;
 
-    public AdStampService(AdFetchService adFetchService, @Qualifier("htmlStamper") Stamper htmlStamper) {
+    /** Pre-compiled pattern for extracting redirect target URLs from ad click-through links. */
+    private static final Pattern AD_URL_PATTERN = Pattern.compile(
+            "href=\"[^\"]*?(?:\\\\?|&amp;|&)url=([^\"&]+)[^\"]*\"");
+
+    public AdStampService(AdFetchService adFetchService,
+                          MetadataFrontPageService metadataFrontPageService,
+                          @Qualifier("htmlStamper") Stamper htmlStamper) {
         this.adFetchService = adFetchService;
+        this.metadataFrontPageService = metadataFrontPageService;
         this.htmlStamper = htmlStamper;
     }
 
@@ -108,10 +115,10 @@ public class AdStampService {
                 }
 
                 // Convert HTML to PDF using target page size
-                byte[] htmlPdfBytes = renderHtmlToPdf(pdfAdOneHtml, pageSize);
+                byte[] htmlPdfBytes = metadataFrontPageService.renderHtmlToPdf(pdfAdOneHtml, pageSize);
 
                 // Prepend HTML PDF to current state of PDF
-                currentPdfBytes = prependPdf(currentPdfBytes, htmlPdfBytes);
+                currentPdfBytes = metadataFrontPageService.prependPdf(currentPdfBytes, htmlPdfBytes);
 
             } catch (Exception e) {
                 throw new StampingException("Failed to prepend pdf ad one page: " + e.getMessage(), e);
@@ -128,11 +135,8 @@ public class AdStampService {
     }
 
     public String processHtmlContent(String htmlContent, String legacyDomain) {
-        // First, extract out the actual 'url' parameter if it's an adclick link so the
-        // PDF links directly
-        java.util.regex.Pattern p = java.util.regex.Pattern
-                .compile("href=\"[^\"]*?(?:\\\\?|&amp;|&)url=([^\"&]+)[^\"]*\"");
-        java.util.regex.Matcher m = p.matcher(htmlContent);
+        // Extract the actual 'url' parameter from adclick redirect links
+        Matcher m = AD_URL_PATTERN.matcher(htmlContent);
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
             try {
@@ -140,7 +144,7 @@ public class AdStampService {
                         java.nio.charset.StandardCharsets.UTF_8.name());
                 m.appendReplacement(sb, "href=\"" + decodedUrl + "\"");
             } catch (Exception e) {
-                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(m.group(0)));
+                m.appendReplacement(sb, Matcher.quoteReplacement(m.group(0)));
             }
         }
         m.appendTail(sb);
@@ -163,49 +167,6 @@ public class AdStampService {
         htmlContent = htmlContent.replace("src=\"/", "src=\"" + baseUrl);
         htmlContent = htmlContent.replace("href=\"/", "href=\"" + baseUrl);
         return htmlContent;
-    }
-
-    private byte[] renderHtmlToPdf(String html, com.itextpdf.kernel.geom.Rectangle pageSize) {
-        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
-            PdfWriter writer = new PdfWriter(os);
-            PdfDocument pdfDoc = new PdfDocument(writer);
-            pdfDoc.setDefaultPageSize(new com.itextpdf.kernel.geom.PageSize(pageSize));
-
-            ConverterProperties props = new ConverterProperties();
-            com.itextpdf.layout.font.FontProvider fontProvider =
-                    new com.itextpdf.html2pdf.resolver.font.DefaultFontProvider(true, true, true);
-            props.setFontProvider(fontProvider);
-            com.itextpdf.layout.Document document = HtmlConverter.convertToDocument(html, pdfDoc, props);
-            document.close();
-
-            return os.toByteArray();
-        } catch (Exception e) {
-            throw new StampingException("Failed to render HTML to PDF: " + e.getMessage(), e);
-        }
-    }
-
-    private byte[] prependPdf(byte[] originalPdfBytes, byte[] appendPdfBytes) {
-        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
-            PdfDocument resultDoc = new PdfDocument(new PdfWriter(os));
-            PdfMerger merger = new PdfMerger(resultDoc);
-
-            PdfDocument appendDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(appendPdfBytes)));
-            PdfDocument originalDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(originalPdfBytes)));
-
-            // Merge the append document (ad page) first
-            merger.merge(appendDoc, 1, appendDoc.getNumberOfPages());
-
-            // Merge the original document next
-            merger.merge(originalDoc, 1, originalDoc.getNumberOfPages());
-
-            appendDoc.close();
-            originalDoc.close();
-            resultDoc.close();
-
-            return os.toByteArray();
-        } catch (Exception e) {
-            throw new StampingException("Failed to merge PDFs: " + e.getMessage(), e);
-        }
     }
 
     private String ensureHtml(String html) {

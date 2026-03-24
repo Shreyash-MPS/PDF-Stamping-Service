@@ -1,13 +1,15 @@
 package com.stamping.model;
 
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonInclude;
-
-import java.util.Map;
 
 @Data
 @Builder
@@ -20,26 +22,27 @@ public class JournalMetadataRequest {
     private String env;
 
     // Core details
-    private String pdfFilePath;      // Absolute path to the source PDF file
-    private String outputPath;       // Optional: Path to save the stamped PDF
-    private String publisherId;      // Used to load saved config (if no inline config)
-    private String jcode;            // Used to load saved config (if no inline config)
+    private String pdfFilePath;
+    private String outputPath;
 
-    // Metadata fields — Drupal sends only the values for fields marked true in the saved config
+    @NotBlank(message = "publisherId is required")
+    private String publisherId;
+
+    @NotBlank(message = "jcode is required")
+    private String jcode;
+
+    // Metadata fields
     private String articleTitle;
     private String authors;
-    private String doiValue;         // e.g. "10.3174/ajnr.A8959"
+    private String doiValue;
     private String articleCopyright;
     private String articleIssn;
     private String articleId;
-    private String downloadedBy;     // Username of the person downloading (populated by Drupal)
+    private String downloadedBy;
 
-    // Inline config — if provided, backend uses this instead of loading from disk
+    // Inline config
     private Map<String, DynamicStampRequest.Configuration> positions;
 
-    /**
-     * Returns true if this request is running in demo mode.
-     */
     @JsonIgnore
     public boolean isDemoMode() {
         return "demo".equalsIgnoreCase(env);
@@ -47,7 +50,7 @@ public class JournalMetadataRequest {
 
     /**
      * Fills in demo default values for any metadata field that is null or blank.
-     * Only applies when env = "demo". Call this before processing the request.
+     * Only applies when env = "demo".
      */
     public void applyDemoDefaults() {
         if (!isDemoMode()) return;

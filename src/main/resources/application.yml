@@ -6,12 +6,35 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 55MB
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
 stamping:
   temp-dir: ${java.io.tmpdir}/pdf-stamping
   default-font-size: 12
   default-font-color: "#000000"
   default-opacity: 0.8
+  config-dir: configs
+  archive-dir: archive_configs
+  test-requests-dir: test_requests
+  allowed-pdf-base-path: ${STAMPING_ALLOWED_PDF_PATH:}
+  ads:
+    base-url: https://bam-ads-presenter.highwire.org/api/ads
+    section-path: xpdf
+    connect-timeout: 5000
+    read-timeout: 10000
+  cors:
+    allowed-origins: ${STAMPING_CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
 
 logging:
   pattern:

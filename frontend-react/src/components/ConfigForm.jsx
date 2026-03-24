@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useConfigContext, getDefaultConfig } from '../context/ConfigContext';
+import { API_BASE } from '../config/api';
 import { ArrowLeft, Save, Eye, X, FilePlus, PanelTop, PanelBottom, PanelLeft, PanelRight, Download, Loader2 } from 'lucide-react';
 import { TEMPLATES, getCurrentDate } from '../models/templates';
 import stampingConfigData from '../data/stamping_config.json';
@@ -207,7 +208,7 @@ const ConfigForm = () => {
         }
         setDownloading(true);
         try {
-            const response = await fetch(`http://localhost:8080/api/v1/stamp/demo-pdf/${pubId}/${jcode}`);
+            const response = await fetch(`${API_BASE}/stamp/demo-pdf/${pubId}/${jcode}`);
             if (!response.ok) throw new Error('Server returned ' + response.status);
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);

@@ -7,9 +7,11 @@ import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stamping.config.StampingProperties;
 import com.stamping.exception.StampingException;
 import com.stamping.model.DynamicStampRequest;
 import com.stamping.model.JournalMetadataRequest;
@@ -19,18 +21,17 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Generates a demo-stamped PDF from a saved frontend config.
- * Creates a blank placeholder PDF, then applies all configured stamps
- * using demo/default metadata values so users can preview the final output.
+ * Only active when spring.profiles.active includes "dev".
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Profile("dev")
 public class DemoStampService {
 
     private final ObjectMapper objectMapper;
     private final DemoConfigGeneratorService demoConfigGeneratorService;
-
-    private static final String CONFIGS_DIR = "configs";
+    private final StampingProperties properties;
 
     // Default demo metadata values
     private static final String DEMO_ARTICLE_TITLE = "Sample Article Title for Demo Preview";
@@ -59,7 +60,7 @@ public class DemoStampService {
      */
     @SuppressWarnings("unchecked")
     public JournalMetadataRequest buildDemoRequest(String pubId, String jcode) {
-        File configFile = new File(CONFIGS_DIR, "config_" + pubId + "_" + jcode + ".json");
+        File configFile = new File(properties.getConfigDir(), "config_" + pubId + "_" + jcode + ".json");
         if (!configFile.exists()) {
             // No saved config — fall back to the default demo request
             log.info("No saved config for {}/{}, using default demo request", pubId, jcode);
