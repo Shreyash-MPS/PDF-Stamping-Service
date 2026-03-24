@@ -77,7 +77,31 @@ public class InputSanitizer {
     }
 
     /**
-     * Validates that a publisher ID or jcode contains only safe characters.
+     * Validates a remote PDF URL.
+     * Accepts http and https schemes. Rejects malformed URLs and path traversal attempts.
+     */
+    public void validatePdfUrl(String url) {
+        if (url == null || url.isBlank()) {
+            throw new StampingException("PDF URL is required");
+        }
+        if (url.contains("..")) {
+            throw new StampingException("Invalid PDF URL: path traversal not allowed");
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+                throw new StampingException("Invalid PDF URL: only http and https schemes are allowed");
+            }
+            if (uri.getHost() == null || uri.getHost().isBlank()) {
+                throw new StampingException("Invalid PDF URL: missing host");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new StampingException("Invalid PDF URL: " + e.getMessage());
+        }
+    }
+
+    /**
      * Prevents path injection via config file naming.
      */
     public void validateIdentifier(String value, String fieldName) {

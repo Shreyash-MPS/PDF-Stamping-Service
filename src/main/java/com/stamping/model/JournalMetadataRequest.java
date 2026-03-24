@@ -21,8 +21,9 @@ public class JournalMetadataRequest {
     // Environment mode — when set to "demo", any null/blank field gets a demo default value
     private String env;
 
-    // Core details
+    // Core details — provide either pdfFilePath (local) or pdfUrl (http/https); pdfUrl takes precedence
     private String pdfFilePath;
+    private String pdfUrl;
     private String outputPath;
 
     @NotBlank(message = "publisherId is required")

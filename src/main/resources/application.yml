@@ -10,7 +10,7 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
 stamping:
-  temp-dir: ${java.io.tmpdir}/pdf-stamping
+  temp-dir: temp
   default-font-size: 12
   default-font-color: "#000000"
   default-opacity: 0.8
@@ -25,6 +25,10 @@ stamping:
     read-timeout: 10000
   cors:
     allowed-origins: ${STAMPING_CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+  pdf-download:
+    connect-timeout: 5000
+    read-timeout: 30000
+    max-file-size: 52428800
 
 # Actuator
 management:

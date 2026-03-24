@@ -23,6 +23,7 @@ public class StampingProperties {
 
     private Ads ads = new Ads();
     private Cors cors = new Cors();
+    private PdfDownload pdfDownload = new PdfDownload();
 
     @Data
     public static class Ads {
@@ -35,5 +36,15 @@ public class StampingProperties {
     @Data
     public static class Cors {
         private List<String> allowedOrigins = List.of("http://localhost:5173", "http://localhost:3000");
+    }
+
+    @Data
+    public static class PdfDownload {
+        /** Connection timeout in milliseconds for remote PDF downloads */
+        private int connectTimeout = 5000;
+        /** Read timeout in milliseconds for remote PDF downloads */
+        private int readTimeout = 30000;
+        /** Maximum allowed PDF file size in bytes (default 50 MB) */
+        private long maxFileSize = 52428800L;
     }
 }

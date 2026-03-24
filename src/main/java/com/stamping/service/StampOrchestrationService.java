@@ -44,6 +44,7 @@ public class StampOrchestrationService {
     private final PdfFontExtractor pdfFontExtractor;
     private final InputSanitizer inputSanitizer;
     private final StampingProperties properties;
+    private final PdfDownloadService pdfDownloadService;
 
     /**
      * Result of the stamping pipeline — the stamped PDF bytes and a suggested filename.
@@ -51,7 +52,7 @@ public class StampOrchestrationService {
     public record StampResult(byte[] pdfBytes, String filename) {}
 
     /**
-     * Runs the full stamping pipeline: validate → read PDF → extract font → process positions → return result.
+     * Runs the full stamping pipeline: validate → resolve PDF source → read PDF → extract font → process positions → return result.
      */
     public StampResult processJournalMetadata(JournalMetadataRequest request) {
         long startTime = System.currentTimeMillis();
@@ -59,70 +60,98 @@ public class StampOrchestrationService {
         // 1. Validate inputs
         validateRequest(request);
 
-        log.info("==========================================================");
-        log.info("  STAMP REQUEST  pubId={}  jcode={}  env={}",
-                request.getPublisherId(), request.getJcode(),
-                request.getEnv() != null ? request.getEnv() : "default");
+        // 2. Resolve PDF source — download from URL to temp file if pdfUrl is provided
+        File downloadedTempFile = null;
+        if (request.getPdfUrl() != null && !request.getPdfUrl().isBlank()) {
+            downloadedTempFile = pdfDownloadService.download(request.getPdfUrl());
+            request.setPdfFilePath(downloadedTempFile.getAbsolutePath());
+        }
 
-        // 2. Read PDF
-        byte[] currentPdfBytes = readPdf(request.getPdfFilePath());
+        try {
+            log.info("==========================================================");
+            log.info("  STAMP REQUEST  pubId={}  jcode={}  env={}",
+                    request.getPublisherId(), request.getJcode(),
+                    request.getEnv() != null ? request.getEnv() : "default");
 
-        // 3. Extract page size and font
-        Rectangle pageSize = extractPageSize(currentPdfBytes);
-        PdfFontExtractor.FontInfo pdfFont = pdfFontExtractor.extractPrimaryFont(currentPdfBytes);
-        String fontFamily = buildFontFamily(pdfFont);
-        logFontInfo(pdfFont, fontFamily);
+            // 3. Read PDF
+            byte[] currentPdfBytes = readPdf(request.getPdfFilePath());
 
-        log.info("----------------------------------------------------------");
+            // 4. Extract page size and font
+            Rectangle pageSize = extractPageSize(currentPdfBytes);
+            PdfFontExtractor.FontInfo pdfFont = pdfFontExtractor.extractPrimaryFont(currentPdfBytes);
+            String fontFamily = buildFontFamily(pdfFont);
+            logFontInfo(pdfFont, fontFamily);
 
-        // 4. Process each position
-        Map<String, DynamicStampRequest.Configuration> positions = request.getPositions();
-        log.info("  Positions: {}", positions.keySet());
+            log.info("----------------------------------------------------------");
 
-        int prependedPages = 0;
-        int appendedPages = 0;
+            // 5. Process each position
+            Map<String, DynamicStampRequest.Configuration> positions = request.getPositions();
+            log.info("  Positions: {}", positions.keySet());
 
-        for (var entry : positions.entrySet()) {
-            String posStr = entry.getKey();
-            DynamicStampRequest.Configuration c = entry.getValue();
-            if (c == null) continue;
+            int prependedPages = 0;
+            int appendedPages = 0;
 
-            if ("NEW_PAGE".equalsIgnoreCase(posStr)) {
-                NewPageResult result = processNewPage(c, request, pdfFont, fontFamily, pageSize, currentPdfBytes);
-                currentPdfBytes = result.pdfBytes;
-                prependedPages += result.prepended;
-                appendedPages += result.appended;
-            } else {
-                currentPdfBytes = processOverlayPosition(posStr, c, request, pdfFont, fontFamily,
-                        pageSize, currentPdfBytes, prependedPages, appendedPages);
+            for (var entry : positions.entrySet()) {
+                String posStr = entry.getKey();
+                DynamicStampRequest.Configuration c = entry.getValue();
+                if (c == null) continue;
+
+                if ("NEW_PAGE".equalsIgnoreCase(posStr)) {
+                    NewPageResult result = processNewPage(c, request, pdfFont, fontFamily, pageSize, currentPdfBytes);
+                    currentPdfBytes = result.pdfBytes;
+                    prependedPages += result.prepended;
+                    appendedPages += result.appended;
+                } else {
+                    currentPdfBytes = processOverlayPosition(posStr, c, request, pdfFont, fontFamily,
+                            pageSize, currentPdfBytes, prependedPages, appendedPages);
+                }
+            }
+
+            // 6. Save to disk if outputPath provided
+            if (request.getOutputPath() != null && !request.getOutputPath().isBlank()) {
+                saveOutput(request.getOutputPath(), currentPdfBytes);
+            }
+
+            String sourceName = request.getPdfUrl() != null && !request.getPdfUrl().isBlank()
+                    ? request.getPdfUrl().substring(request.getPdfUrl().lastIndexOf('/') + 1)
+                    : new File(request.getPdfFilePath()).getName();
+            String outputFilename = buildOutputFilename(sourceName);
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("----------------------------------------------------------");
+            log.info("  DONE  {}ms  output={}  size={} KB", elapsed, outputFilename, currentPdfBytes.length / 1024);
+            log.info("==========================================================");
+
+            return new StampResult(currentPdfBytes, outputFilename);
+        } finally {
+            if (downloadedTempFile != null && downloadedTempFile.exists()) {
+                downloadedTempFile.delete();
             }
         }
-
-        // 5. Save to disk if outputPath provided
-        if (request.getOutputPath() != null && !request.getOutputPath().isBlank()) {
-            saveOutput(request.getOutputPath(), currentPdfBytes);
-        }
-
-        String outputFilename = buildOutputFilename(new File(request.getPdfFilePath()).getName());
-        long elapsed = System.currentTimeMillis() - startTime;
-        log.info("----------------------------------------------------------");
-        log.info("  DONE  {}ms  output={}  size={} KB", elapsed, outputFilename, currentPdfBytes.length / 1024);
-        log.info("==========================================================");
-
-        return new StampResult(currentPdfBytes, outputFilename);
     }
 
     // ─── Validation ─────────────────────────────────────────────────────
 
     private void validateRequest(JournalMetadataRequest request) {
-        inputSanitizer.validateFilePath(request.getPdfFilePath());
+        boolean hasUrl = request.getPdfUrl() != null && !request.getPdfUrl().isBlank();
+        boolean hasPath = request.getPdfFilePath() != null && !request.getPdfFilePath().isBlank();
+
+        if (!hasUrl && !hasPath) {
+            throw new StampingException("Either pdfUrl or pdfFilePath is required");
+        }
+
+        if (hasUrl) {
+            inputSanitizer.validatePdfUrl(request.getPdfUrl());
+        } else {
+            inputSanitizer.validateFilePath(request.getPdfFilePath());
+            File inputFile = new File(request.getPdfFilePath());
+            if (!inputFile.exists() || !inputFile.canRead()) {
+                throw new StampingException("Cannot read input file: " + request.getPdfFilePath());
+            }
+        }
+
         inputSanitizer.validateIdentifier(request.getPublisherId(), "publisherId");
         inputSanitizer.validateIdentifier(request.getJcode(), "jcode");
 
-        File inputFile = new File(request.getPdfFilePath());
-        if (!inputFile.exists() || !inputFile.canRead()) {
-            throw new StampingException("Cannot read input file: " + request.getPdfFilePath());
-        }
         if (request.getPositions() == null || request.getPositions().isEmpty()) {
             throw new StampingException("positions map is required in the request JSON");
         }
