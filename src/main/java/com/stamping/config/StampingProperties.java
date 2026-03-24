@@ -7,18 +7,48 @@ import org.springframework.stereotype.Component;
 
 import lombok.Data;
 
+/**
+ * Typed configuration properties for the stamping service.
+ * All values are bound from the "stamping" prefix in application.yml.
+ *
+ * <p>Example application.yml block:
+ * <pre>
+ * stamping:
+ *   temp-dir: temp
+ *   config-dir: configs
+ *   archive-dir: archive_configs
+ *   allowed-pdf-base-path: /var/data/pdfs
+ *   ads:
+ *     base-url: https://bam-ads-presenter.highwire.org/api/ads
+ *   cors:
+ *     allowed-origins: https://myapp.example.com
+ *   pdf-download:
+ *     connect-timeout: 5000
+ *     read-timeout: 30000
+ *     max-file-size: 52428800
+ * </pre>
+ */
 @Data
 @Component
 @ConfigurationProperties(prefix = "stamping")
 public class StampingProperties {
 
+    /** Directory where downloaded and demo temp PDFs are written. Cleaned up by PdfDownloadService scheduler. */
     private String tempDir;
     private int defaultFontSize = 12;
     private String defaultFontColor = "#000000";
     private double defaultOpacity = 0.8;
+    /** Directory where active publisher/journal stamping configs are stored. */
     private String configDir = "configs";
+    /** Directory where archived (soft-deleted) configs are moved to. */
     private String archiveDir = "archive_configs";
+    /** Directory where auto-generated demo test request JSON files are written (dev only). */
     private String testRequestsDir = "test_requests";
+    /**
+     * Optional base path restriction for local PDF file access.
+     * When set, any pdfFilePath outside this directory is rejected.
+     * Leave blank to allow any accessible path.
+     */
     private String allowedPdfBasePath = "";
 
     private Ads ads = new Ads();

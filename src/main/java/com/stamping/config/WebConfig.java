@@ -6,6 +6,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Configures CORS for all /api/** endpoints.
+ * Allowed origins are driven by stamping.cors.allowed-origins in application.yml,
+ * so no code change is needed when adding or removing frontend origins.
+ */
 @Configuration
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
