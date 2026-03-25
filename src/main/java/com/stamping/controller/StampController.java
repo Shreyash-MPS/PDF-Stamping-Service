@@ -27,7 +27,6 @@ import com.stamping.config.StampingProperties;
 import com.stamping.exception.StampingException;
 import com.stamping.model.JournalMetadataRequest;
 import com.stamping.model.StampResponse;
-import com.stamping.service.DemoConfigGeneratorService;
 import com.stamping.service.DemoStampService;
 import com.stamping.service.InputSanitizer;
 import com.stamping.service.StampOrchestrationService;
@@ -44,7 +43,6 @@ public class StampController {
     private final ObjectMapper objectMapper;
     private final InputSanitizer inputSanitizer;
     private final StampingProperties properties;
-    private final DemoConfigGeneratorService demoConfigGeneratorService;
     private final DemoStampService demoStampService;
 
     @Autowired
@@ -52,13 +50,11 @@ public class StampController {
                            ObjectMapper objectMapper,
                            InputSanitizer inputSanitizer,
                            StampingProperties properties,
-                           @Autowired(required = false) DemoConfigGeneratorService demoConfigGeneratorService,
-                           @Autowired(required = false) DemoStampService demoStampService) {
+                           DemoStampService demoStampService) {
         this.orchestrationService = orchestrationService;
         this.objectMapper = objectMapper;
         this.inputSanitizer = inputSanitizer;
         this.properties = properties;
-        this.demoConfigGeneratorService = demoConfigGeneratorService;
         this.demoStampService = demoStampService;
     }
 
@@ -71,7 +67,7 @@ public class StampController {
             request.applyDemoDefaults();
 
             // In demo mode, auto-fill positions and create blank PDF if needed
-            if (request.isDemoMode() && demoStampService != null) {
+            if (request.isDemoMode()) {
                 demoTempFile = prepareDemoMode(request);
             }
 
@@ -100,10 +96,6 @@ public class StampController {
         try {
             inputSanitizer.validateIdentifier(pubId, "pubId");
             inputSanitizer.validateIdentifier(jcode, "jcode");
-
-            if (demoStampService == null) {
-                throw new StampingException("Demo mode is not available in this environment");
-            }
 
             JournalMetadataRequest demoRequest = demoStampService.buildDemoRequest(pubId, jcode);
             byte[] blankPdf = demoStampService.createBlankPdf();
@@ -209,11 +201,6 @@ public class StampController {
             Files.writeString(outputFile.toPath(), json, StandardCharsets.UTF_8);
 
             log.info("Config saved: {}", outputFile.getAbsolutePath());
-
-            // DEV-ONLY: auto-generate demo test request
-            if (demoConfigGeneratorService != null) {
-                demoConfigGeneratorService.generateDemoTestConfig(rawConfig);
-            }
 
             return ResponseEntity.ok(StampResponse.builder()
                     .success(true).message("Configuration saved successfully")

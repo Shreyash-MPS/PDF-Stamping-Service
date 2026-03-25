@@ -6,8 +6,6 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 55MB
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
 
 stamping:
   temp-dir: temp
@@ -16,7 +14,6 @@ stamping:
   default-opacity: 0.8
   config-dir: configs
   archive-dir: archive_configs
-  test-requests-dir: test_requests
   allowed-pdf-base-path: ${STAMPING_ALLOWED_PDF_PATH:}
   ads:
     base-url: https://bam-ads-presenter.highwire.org/api/ads
@@ -46,7 +43,6 @@ logging:
   level:
     root: WARN
     com.stamping: INFO
-    com.stamping.service.AdFetchService: DEBUG
     org.springframework.web: WARN
     org.apache.pdfbox: WARN
     com.itextpdf: WARN

@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,13 +19,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Generates a demo-stamped PDF from a saved frontend config.
- * Only active when spring.profiles.active includes "dev".
+ * Builds demo/sample JournalMetadataRequests from saved frontend configs.
+ * Used by the sample PDF download feature (GET /stamp/demo-pdf/{pubId}/{jcode})
+ * and the env=demo stamping flow.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Profile("dev")
 public class DemoStampService {
 
     private final ObjectMapper objectMapper;

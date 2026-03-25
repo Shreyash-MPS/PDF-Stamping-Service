@@ -42,8 +42,6 @@ public class StampingProperties {
     private String configDir = "configs";
     /** Directory where archived (soft-deleted) configs are moved to. */
     private String archiveDir = "archive_configs";
-    /** Directory where auto-generated demo test request JSON files are written (dev only). */
-    private String testRequestsDir = "test_requests";
     /**
      * Optional base path restriction for local PDF file access.
      * When set, any pdfFilePath outside this directory is rejected.
