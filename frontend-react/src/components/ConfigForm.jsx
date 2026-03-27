@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useConfigContext, getDefaultConfig } from '../context/ConfigContext';
 import { API_BASE } from '../config/api';
-import { ArrowLeft, Save, Eye, X, FilePlus, PanelTop, PanelBottom, PanelLeft, PanelRight, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Eye, X, FilePlus, PanelTop, PanelBottom, PanelLeft, PanelRight, Download, Loader2, ChevronRight } from 'lucide-react';
 import { TEMPLATES, getCurrentDate } from '../models/templates';
 import stampingConfigData from '../data/stamping_config.json';
 import StampSectionPanel from './StampSectionPanel';
@@ -43,7 +43,40 @@ const getSectionSummary = (section) => {
     return items;
 };
 
-/* Full PDF preview modal */
+/* ── Breadcrumb ── */
+const Breadcrumb = ({ isEdit, pubId, jcode }) => {
+    const navigate = useNavigate();
+    const label = isEdit && pubId && jcode ? `${pubId} / ${jcode}` : isEdit ? 'Edit Configuration' : 'New Configuration';
+    return (
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-gray-400 mb-5">
+            <button onClick={() => navigate('/')} className="hover:text-[#a81732] transition-colors cursor-pointer">
+                Configurations
+            </button>
+            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="text-gray-700 font-medium truncate max-w-[240px]">{label}</span>
+        </nav>
+    );
+};
+
+/* ── Toast banner ── */
+const ToastBanner = ({ toast }) => {
+    if (!toast) return null;
+    return (
+        <div role="alert" className={`mb-4 px-4 py-2.5 rounded-md text-sm font-medium flex items-center gap-2 ${
+            toast.isError
+                ? 'bg-red-50 text-red-700 border border-red-200'
+                : 'bg-green-50 text-green-700 border border-green-200'
+        }`}>
+            {toast.isError
+                ? <X className="w-4 h-4 flex-shrink-0" />
+                : <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center rounded-full bg-green-500 text-white text-xs">✓</span>
+            }
+            {toast.msg}
+        </div>
+    );
+};
+
+/* ── Preview modal ── */
 const PreviewModal = ({ sections, templateName, onTemplateChange, onClose }) => {
     const template = TEMPLATES[templateName];
     const date = getCurrentDate();
@@ -97,11 +130,10 @@ const PreviewModal = ({ sections, templateName, onTemplateChange, onClose }) => 
                     if (!newPageSection.articleDoi) doc.querySelectorAll('.doi-block').forEach(e => e.remove());
                     if (!newPageSection.adsBanner?.enabled) doc.querySelectorAll('.ad-banner-block').forEach(e => e.remove());
                     if (!newPageSection.dateOfDownload) doc.querySelectorAll('.date-block').forEach(e => e.remove());
-                    
                     html = doc.body.innerHTML;
                 }
             } catch (e) {
-                console.error("Error parsing html for template preview", e);
+                console.error('Error parsing html for template preview', e);
             }
             newPageHtml = html;
         } else if (newPageSection.enabled) {
@@ -145,7 +177,7 @@ const PreviewModal = ({ sections, templateName, onTemplateChange, onClose }) => 
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                     <h2 className="text-lg font-bold text-gray-800">Stamp Preview</h2>
-                    <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} aria-label="Close preview" className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5" /></button>
                 </div>
                 <div className="px-5 py-3 border-b border-gray-100 bg-[#fafafa]">
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Template</label>
@@ -181,6 +213,8 @@ const ConfigForm = () => {
     } = useConfigContext();
 
     const defaults = getDefaultConfig();
+    const tabBarRef = useRef(null);
+    const [tabScrollable, setTabScrollable] = useState(false);
 
     const [pubId, setPubId] = useState('');
     const [pubName, setPubName] = useState('');
@@ -200,6 +234,18 @@ const ConfigForm = () => {
     const [toast, setToast] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [downloading, setDownloading] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    // Detect if tab bar overflows (show fade indicator)
+    useEffect(() => {
+        const el = tabBarRef.current;
+        if (!el) return;
+        const check = () => setTabScrollable(el.scrollWidth > el.clientWidth);
+        check();
+        const ro = new ResizeObserver(check);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
 
     const handleDownloadSample = async () => {
         if (!pubId || !jcode) {
@@ -248,7 +294,7 @@ const ConfigForm = () => {
 
     const showToast = (msg, isError = false) => {
         setToast({ msg, isError });
-        setTimeout(() => setToast(null), 3000);
+        setTimeout(() => setToast(null), 3500);
     };
 
     const updateSection = (key, value) => {
@@ -260,85 +306,95 @@ const ConfigForm = () => {
             showToast('Publisher and Journal are required.', true);
             return;
         }
-        if (isNewPublisher && pubName) {
-            addPublisher({ pubId, pubName, journals: [] });
-        }
-        if (isNewJournal && jName) {
-            addJournalToPublisher(pubId, { jcode, jName });
-        }
-        const configData = { pubId, jcode, templateName, ...sections };
-        let result;
-        if (isEdit) {
-            result = await updateConfig(Number(id), configData);
-        } else {
-            const existing = configs.find(c => c.pubId === pubId && c.jcode === jcode && !c.archived);
-            if (existing) {
-                showToast('A configuration for this publisher and journal already exists. Updating it instead.');
-                result = await updateConfig(existing.id, configData);
-            } else {
-                result = await addConfig(configData);
-            }
-        }
+        setSaving(true);
+        try {
+            if (isNewPublisher && pubName) addPublisher({ pubId, pubName, journals: [] });
+            if (isNewJournal && jName) addJournalToPublisher(pubId, { jcode, jName });
 
-        if (result?.success) {
-            showToast(isEdit ? 'Configuration updated and saved.' : 'Configuration created and saved.');
-        } else {
-            showToast('Configuration saved locally but server save failed.', true);
+            const configData = { pubId, jcode, templateName, ...sections };
+            let result;
+            if (isEdit) {
+                result = await updateConfig(Number(id), configData);
+            } else {
+                const existing = configs.find(c => c.pubId === pubId && c.jcode === jcode && !c.archived);
+                if (existing) {
+                    showToast('Configuration already exists — updating it instead.');
+                    result = await updateConfig(existing.id, configData);
+                } else {
+                    result = await addConfig(configData);
+                }
+            }
+
+            if (result?.success) {
+                showToast(isEdit ? 'Configuration updated and saved.' : 'Configuration created and saved.');
+            } else {
+                showToast('Configuration saved locally but server save failed.', true);
+            }
+            setTimeout(() => navigate('/'), 500);
+        } finally {
+            setSaving(false);
         }
-        setTimeout(() => navigate('/'), 500);
     };
 
     const enabledCount = TABS.filter(t => sections[t.key].enabled).length;
 
     return (
-        <div className="min-h-screen bg-[#f5f5f5]">
+        <div className="min-h-screen bg-[#f5f5f5] pb-24">
             <div className="max-w-4xl mx-auto px-6 py-8">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/')} className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors cursor-pointer">
-                            <ArrowLeft className="w-5 h-5" />
-                        </button>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-800">{isEdit ? 'Edit Configuration' : 'Add Configuration'}</h1>
-                            <p className="text-sm text-gray-500 mt-0.5">{enabledCount} section{enabledCount !== 1 ? 's' : ''} enabled</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setShowPreview(true)} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-[#a81732] border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer">
-                            <Eye className="w-4 h-4" />View Preview
-                        </button>
-                        {isEdit && (
-                            <button onClick={handleDownloadSample} disabled={downloading} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-600 border border-blue-400 rounded-md hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait">
-                                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                Sample PDF
-                            </button>
-                        )}
-                        <button onClick={handleSave} className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#a81732] rounded-md hover:bg-[#851227] transition-colors cursor-pointer">
-                            <Save className="w-4 h-4" />{isEdit ? 'Update' : 'Save'}
-                        </button>
+
+                {/* Breadcrumb */}
+                <Breadcrumb isEdit={isEdit} pubId={pubId} jcode={jcode} />
+
+                {/* Page title row */}
+                <div className="flex items-center gap-3 mb-6">
+                    <button
+                        onClick={() => navigate('/')}
+                        aria-label="Back to configurations"
+                        className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors cursor-pointer"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-800">
+                            {isEdit ? 'Edit Configuration' : 'Add Configuration'}
+                        </h1>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                            {enabledCount} section{enabledCount !== 1 ? 's' : ''} enabled
+                        </p>
                     </div>
                 </div>
 
-                {toast && (
-                    <div className={`mb-4 px-4 py-2.5 rounded-md text-sm font-medium ${toast.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>{toast.msg}</div>
-                )}
+                {/* Toast */}
+                <ToastBanner toast={toast} />
 
+                {/* Publisher / Journal selectors */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mb-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-1">Publisher</label>
                             {!isNewPublisher ? (
                                 <div className="flex gap-2">
-                                    <SearchableSelect options={publishers.map(p => ({ value: p.pubId, label: p.pubName }))} value={pubId}
-                                        onChange={v => { setPubId(v); setJcode(''); setIsNewJournal(false); }} placeholder="Select publisher..." disabled={isEdit} />
-                                    {!isEdit && (<button onClick={() => { setIsNewPublisher(true); setPubId(''); setJcode(''); }}
-                                        className="px-2 py-1.5 text-xs text-[#a81732] border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer whitespace-nowrap">+ New</button>)}
+                                    <SearchableSelect
+                                        options={publishers.map(p => ({ value: p.pubId, label: p.pubName }))}
+                                        value={pubId}
+                                        onChange={v => { setPubId(v); setJcode(''); setIsNewJournal(false); }}
+                                        placeholder="Select publisher..."
+                                        disabled={isEdit}
+                                    />
+                                    {!isEdit && (
+                                        <button
+                                            onClick={() => { setIsNewPublisher(true); setPubId(''); setJcode(''); }}
+                                            className="px-2 py-1.5 text-xs text-[#a81732] border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer whitespace-nowrap"
+                                        >+ New</button>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-1.5">
-                                    <input type="text" placeholder="Publisher ID" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
+                                    <input type="text" placeholder="Publisher ID"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
                                         value={pubId} onChange={e => setPubId(e.target.value)} />
-                                    <input type="text" placeholder="Publisher Name" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
+                                    <input type="text" placeholder="Publisher Name"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
                                         value={pubName} onChange={e => setPubName(e.target.value)} />
                                     <button onClick={() => { setIsNewPublisher(false); setPubId(''); }} className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer">← Existing</button>
                                 </div>
@@ -348,16 +404,27 @@ const ConfigForm = () => {
                             <label className="block text-sm font-semibold text-gray-700 mb-1">Journal</label>
                             {!isNewJournal ? (
                                 <div className="flex gap-2">
-                                    <SearchableSelect options={journals.map(j => ({ value: j.jcode, label: j.jName }))} value={jcode}
-                                        onChange={v => setJcode(v)} placeholder="Select journal..." disabled={isEdit || (!pubId && !isNewPublisher)} />
-                                    {!isEdit && pubId && (<button onClick={() => { setIsNewJournal(true); setJcode(''); }}
-                                        className="px-2 py-1.5 text-xs text-[#a81732] border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer whitespace-nowrap">+ New</button>)}
+                                    <SearchableSelect
+                                        options={journals.map(j => ({ value: j.jcode, label: j.jName }))}
+                                        value={jcode}
+                                        onChange={v => setJcode(v)}
+                                        placeholder="Select journal..."
+                                        disabled={isEdit || (!pubId && !isNewPublisher)}
+                                    />
+                                    {!isEdit && pubId && (
+                                        <button
+                                            onClick={() => { setIsNewJournal(true); setJcode(''); }}
+                                            className="px-2 py-1.5 text-xs text-[#a81732] border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer whitespace-nowrap"
+                                        >+ New</button>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-1.5">
-                                    <input type="text" placeholder="Journal Code" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
+                                    <input type="text" placeholder="Journal Code"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
                                         value={jcode} onChange={e => setJcode(e.target.value)} />
-                                    <input type="text" placeholder="Journal Name" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
+                                    <input type="text" placeholder="Journal Name"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#a81732]/20 focus:border-[#a81732]"
                                         value={jName} onChange={e => setJName(e.target.value)} />
                                     <button onClick={() => { setIsNewJournal(false); setJcode(''); }} className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer">← Existing</button>
                                 </div>
@@ -366,22 +433,51 @@ const ConfigForm = () => {
                     </div>
                 </div>
 
+                {/* Section tabs */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="flex border-b border-gray-200 bg-[#fafafa] overflow-x-auto">
-                        {TABS.map(tab => {
-                            const Icon = tab.icon;
-                            const isActive = activeTab === tab.key;
-                            const isEnabled = sections[tab.key].enabled;
-                            return (
-                                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                    className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${isActive ? 'border-[#a81732] text-[#a81732] bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
-                                    <Icon className="w-4 h-4" />{tab.label}
-                                    {isEnabled && <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-[#a81732]' : 'bg-green-500'}`} />}
-                                </button>
-                            );
-                        })}
+                    <div className="relative">
+                        <div
+                            ref={tabBarRef}
+                            role="tablist"
+                            aria-label="Stamp sections"
+                            className="flex border-b border-gray-200 bg-[#fafafa] overflow-x-auto scrollbar-none"
+                        >
+                            {TABS.map(tab => {
+                                const Icon = tab.icon;
+                                const isActive = activeTab === tab.key;
+                                const isEnabled = sections[tab.key].enabled;
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        role="tab"
+                                        aria-selected={isActive}
+                                        aria-controls={`tabpanel-${tab.key}`}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                                            isActive
+                                                ? 'border-[#a81732] text-[#a81732] bg-white'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <Icon className="w-4 h-4" />
+                                        {tab.label}
+                                        {isEnabled && (
+                                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-[#a81732]' : 'bg-green-500'}`} />
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {/* Scroll fade indicator */}
+                        {tabScrollable && (
+                            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-[#fafafa] to-transparent" />
+                        )}
                     </div>
-                    <div className="p-6">
+                    <div
+                        id={`tabpanel-${activeTab}`}
+                        role="tabpanel"
+                        className="p-6"
+                    >
                         <StampSectionPanel
                             sectionKey={activeTab}
                             section={sections[activeTab]}
@@ -391,26 +487,54 @@ const ConfigForm = () => {
                         />
                     </div>
                 </div>
+            </div>
 
-                <div className="flex gap-3 mt-5">
-                    <button onClick={() => navigate('/')} className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors cursor-pointer">Cancel</button>
-                    <button onClick={() => setShowPreview(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-[#a81732] bg-white border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer">
-                        <Eye className="w-4 h-4" />View Preview
+            {/* Sticky bottom action bar */}
+            <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
+                <div className="max-w-4xl mx-auto px-6 py-3 flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/')}
+                        className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                        Cancel
+                    </button>
+                    <div className="flex-1" />
+                    <button
+                        onClick={() => setShowPreview(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#a81732] border border-[#a81732] rounded-md hover:bg-[#fdf2f4] transition-colors cursor-pointer"
+                    >
+                        <Eye className="w-4 h-4" />
+                        Preview
                     </button>
                     {isEdit && (
-                        <button onClick={handleDownloadSample} disabled={downloading} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-600 bg-white border border-blue-400 rounded-md hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait">
+                        <button
+                            onClick={handleDownloadSample}
+                            disabled={downloading}
+                            aria-label="Download sample PDF"
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 border border-blue-400 rounded-md hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                        >
                             {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                             Sample PDF
                         </button>
                     )}
-                    <button onClick={handleSave} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#a81732] rounded-md hover:bg-[#851227] transition-colors cursor-pointer">
-                        <Save className="w-4 h-4" />{isEdit ? 'Update' : 'Save'} Configuration
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-[#a81732] rounded-md hover:bg-[#851227] transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+                    >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        {isEdit ? 'Update' : 'Save'}
                     </button>
                 </div>
             </div>
 
             {showPreview && (
-                <PreviewModal sections={sections} templateName={templateName} onTemplateChange={setTemplateName} onClose={() => setShowPreview(false)} />
+                <PreviewModal
+                    sections={sections}
+                    templateName={templateName}
+                    onTemplateChange={setTemplateName}
+                    onClose={() => setShowPreview(false)}
+                />
             )}
         </div>
     );

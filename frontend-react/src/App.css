@@ -9,3 +9,12 @@ body {
     flex-direction: column;
     min-height: 100vh;
 }
+
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
