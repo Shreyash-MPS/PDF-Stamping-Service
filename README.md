@@ -22,7 +22,6 @@ Integrates with external systems (e.g. Drupal) via a JSON REST API. Accepts PDFs
 - [Frontend](#frontend)
 - [Project Structure](#project-structure)
 - [Deployment](#deployment)
-- [Dev Utilities](#dev-utilities)
 
 ---
 
@@ -50,6 +49,7 @@ Integrates with external systems (e.g. Drupal) via a JSON REST API. Accepts PDFs
 │  │  TemplateService      (HTML template rendering)   │          │
 │  │  MetadataFrontPageService  (HTML→PDF + merge)     │          │
 │  │  AdFetchService / AdStampService  (BAM ads)       │          │
+│  │  DemoStampService     (demo/sample PDF generation)│          │
 │  └────┬──────────────────────────────────────────────┘          │
 │       │                                                          │
 │  ┌────▼──────────────────────────────────────────────┐          │
@@ -142,7 +142,6 @@ All settings live under the `stamping` prefix in `application.yml`.
 | `temp-dir` | `temp` | Directory for downloaded and demo temp PDFs |
 | `config-dir` | `configs` | Active publisher/journal stamping configs |
 | `archive-dir` | `archive_configs` | Archived (soft-deleted) configs |
-| `test-requests-dir` | `test_requests` | Auto-generated demo request JSON files (dev) |
 | `allowed-pdf-base-path` | _(empty)_ | Restrict local PDF access to this directory. Leave blank to allow any path |
 
 **Ads**
@@ -172,7 +171,6 @@ All settings live under the `stamping` prefix in `application.yml`.
 
 | Variable | Maps to |
 |---|---|
-| `SPRING_PROFILES_ACTIVE` | Spring profile (`dev` by default) |
 | `STAMPING_ALLOWED_PDF_PATH` | `allowed-pdf-base-path` |
 | `STAMPING_CORS_ORIGINS` | `cors.allowed-origins` (comma-separated) |
 
@@ -182,166 +180,57 @@ All settings live under the `stamping` prefix in `application.yml`.
 
 **Base URL:** `/api/v1`
 
+See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for full endpoint details, request/response schemas, and examples.
+
 **Error response shape:**
 
 ```json
 {
-  "timestamp": "2026-03-24T15:20:00",
+  "timestamp": "2026-03-27T15:20:00",
   "status": 400,
   "error": "Bad Request",
   "message": "Either pdfUrl or pdfFilePath is required"
 }
 ```
 
----
+### Endpoints
 
-### POST `/api/v1/stamp/journal-metadata`
-
-Stamps a PDF with metadata pages and overlays. The primary integration endpoint for external systems like Drupal.
-
-**Content-Type:** `application/json`  
-**Response:** `application/pdf` — stamped PDF as a file attachment
-
-#### Request fields
-
-| Field | Type | Required | Description |
-|---|---|:---:|---|
-| `pdfUrl` | string | one of | Remote URL of the source PDF (`http` or `https`) |
-| `pdfFilePath` | string | one of | Absolute local path to the source PDF |
-| `outputPath` | string | no | If provided, the stamped PDF is also saved to this path |
-| `publisherId` | string | yes | Publisher identifier — must match a saved config |
-| `jcode` | string | yes | Journal code — must match a saved config |
-| `env` | string | no | Set to `demo` to auto-fill any blank metadata fields with placeholders |
-| `articleTitle` | string | no | Article title |
-| `authors` | string | no | Author names |
-| `doiValue` | string | no | DOI value, e.g. `10.3174/ajnr.A8959` |
-| `articleCopyright` | string | no | Copyright line |
-| `articleIssn` | string | no | ISSN |
-| `articleId` | string | no | Article identifier |
-| `downloadedBy` | string | no | Username of the downloading user |
-| `positions` | object | yes | Map of position key → configuration object (see below) |
-
-> Provide either `pdfUrl` or `pdfFilePath`. If both are present, `pdfUrl` takes precedence.
-
-#### Position configuration object
-
-| Field | Type | Description |
+| Method | Endpoint | Description |
 |---|---|---|
-| `templateName` | string | Template for `NEW_PAGE` (e.g. `journal_article`, `default_metadata`) |
-| `pagePosition` | string | `front` or `back` — where to insert the new page (NEW_PAGE only) |
-| `includeArticleTitle` | boolean | Render article title |
-| `includeAuthors` | boolean | Render authors |
-| `includeDoi` | boolean | Render DOI as a hyperlink |
-| `includeDate` | boolean | Render current date |
-| `includeCopyright` | boolean | Render copyright |
-| `includeIssn` | boolean | Render ISSN |
-| `includeArticleId` | boolean | Render article ID |
-| `includeCurrentUser` | boolean | Render downloaded-by username |
-| `logo` | string | Base64-encoded logo image (raw base64, no data URI prefix) |
-| `logoMimeType` | string | MIME type of logo, e.g. `image/png`, `image/svg+xml` |
-| `text` | string | Plain text to stamp |
-| `html` | string | Raw HTML to stamp (sanitized via OWASP before rendering) |
-| `linkUrl` | string | Hyperlink URL |
-| `linkText` | string | Hyperlink display text |
-| `adsEnabled` | boolean | Fetch and inject ads from BAM at stamp time |
-| `legacyDomain` | string | Domain for resolving relative ad image paths (e.g. `hwmaint.genome.cshlp.org`) |
+| POST | `/api/v1/stamp/journal-metadata` | Stamp a PDF with metadata, ads, cover pages |
+| GET | `/api/v1/stamp/demo-pdf/{pubId}/{jcode}` | Download a demo-stamped PDF |
+| GET | `/api/v1/configs` | List all saved configurations |
+| GET | `/api/v1/configs/{pubId}/{jcode}` | Get a single configuration |
+| POST | `/api/v1/configs` | Save (create/update) a configuration |
+| DELETE | `/api/v1/configs/{pubId}/{jcode}` | Archive (soft-delete) a configuration |
+| PUT | `/api/v1/configs/{pubId}/{jcode}/restore` | Restore an archived configuration |
 
-#### Example — local file path
+### Sample curl requests
 
-```json
-{
-  "pdfFilePath": "/var/data/articles/input.pdf",
-  "publisherId": "ASNR",
-  "jcode": "neuro",
-  "articleTitle": "Imaging Biomarkers in Neurological Disease",
-  "authors": "Smith J, Doe A, Lee K",
-  "doiValue": "10.3174/ajnr.A8959",
-  "articleCopyright": "© 2026 ASNR. All rights reserved.",
-  "articleIssn": "1936-959X",
-  "positions": {
-    "NEW_PAGE": {
-      "templateName": "journal_article",
-      "pagePosition": "front",
-      "includeArticleTitle": true,
-      "includeAuthors": true,
-      "includeDoi": true,
-      "includeDate": true
-    },
-    "HEADER": {
-      "text": "Downloaded from ajnr.org",
-      "includeDate": true
-    },
-    "FOOTER": {
-      "includeCopyright": true
-    }
-  }
-}
+```bash
+# Stamp using a local file path
+curl -X POST http://localhost:8080/api/v1/stamp/journal-metadata \
+  -H "Content-Type: application/json" \
+  -d @test_requests/journal_metadata_demoPub_demoJcode.json \
+  --output stamped.pdf
+
+# Stamp using a remote URL
+curl -X POST http://localhost:8080/api/v1/stamp/journal-metadata \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdfUrl": "https://example.org/article.pdf",
+    "publisherId": "demoPub",
+    "jcode": "demoJcode",
+    "env": "demo"
+  }' \
+  --output stamped.pdf
+
+# Download a demo-stamped PDF
+curl http://localhost:8080/api/v1/stamp/demo-pdf/demoPub/demoJcode --output demo.pdf
+
+# List all configs
+curl http://localhost:8080/api/v1/configs
 ```
-
-#### Example — remote URL (Drupal integration)
-
-```json
-{
-  "pdfUrl": "https://cdn.example.org/articles/2026/article-123.pdf",
-  "publisherId": "ASNR",
-  "jcode": "neuro",
-  "articleTitle": "Imaging Biomarkers in Neurological Disease",
-  "authors": "Smith J, Doe A, Lee K",
-  "doiValue": "10.3174/ajnr.A8959",
-  "positions": {
-    "NEW_PAGE": {
-      "templateName": "journal_article",
-      "pagePosition": "front",
-      "includeArticleTitle": true,
-      "includeAuthors": true,
-      "includeDoi": true,
-      "includeDate": true
-    }
-  }
-}
-```
-
----
-
-### GET `/api/v1/stamp/demo-pdf/{pubId}/{jcode}`
-
-Generates a demo-stamped PDF using placeholder metadata for a saved configuration. Used by the frontend "Download Demo" button.
-
-**Response:** `application/pdf`
-
----
-
-### GET `/api/v1/configs`
-
-Returns all active (non-archived) stamping configurations as a JSON array.
-
----
-
-### GET `/api/v1/configs/{pubId}/{jcode}`
-
-Returns a single configuration by publisher ID and journal code.
-
-**404** if no config exists for the given identifiers.
-
----
-
-### POST `/api/v1/configs`
-
-Creates or updates a stamping configuration. Saved to `configs/config_{pubId}_{jcode}.json`.
-
-**Content-Type:** `application/json`
-
----
-
-### DELETE `/api/v1/configs/{pubId}/{jcode}`
-
-Soft-deletes a configuration by moving it to `archive_configs/`. Recoverable via the restore endpoint.
-
----
-
-### PUT `/api/v1/configs/{pubId}/{jcode}/restore`
-
-Restores an archived configuration back to `configs/`.
 
 ---
 
@@ -356,9 +245,9 @@ The service accepts the source PDF in two ways:
 
 When `pdfUrl` is provided:
 - The file is downloaded to `temp/` using JDK 17's `HttpClient`
-- Streamed to disk (not buffered in memory) — safe for large files
+- Streamed to disk in 8 KB chunks (not buffered in memory) — safe for large files
 - Deleted immediately after stamping completes (or on error)
-- A scheduled cleanup job runs every 15 minutes to remove any files older than 30 minutes
+- A scheduled cleanup job runs every 15 minutes to remove any orphaned files older than 30 minutes
 
 Constraints on `pdfUrl`:
 - Must use `http` or `https` scheme
@@ -376,7 +265,7 @@ Templates define the HTML layout for `NEW_PAGE` positions. `TemplateService` ren
 | Name | Description |
 |---|---|
 | `journal_article` | Two-column layout — logo + date on left, title + authors + DOI on right |
-| `genome_last_page` | Genome Research last-page layout with P&lt;P table, Creative Commons license, ad banner |
+| `genome_last_page` | Genome Research last-page layout with P&P table, Creative Commons license, ad banner |
 | `default_metadata` | Centered layout with all metadata fields |
 | `simple_header` | Minimal centered layout — title, authors, DOI, date |
 | `custom_html` | Blank canvas — renders whatever is in the `html` field |
@@ -431,7 +320,7 @@ The service extracts the primary font from the input PDF and injects it into HTM
 - Subset fonts (identified by a 6-letter uppercase prefix, e.g. `FZQQVU+CMR17`) are excluded from `@font-face` injection — they only contain glyphs used in the original document and cannot render arbitrary new text
 - Fallback CSS font stack: `Verdana, Arial, Helvetica, sans-serif`
 
-All HTML-to-PDF rendering uses `DefaultFontProvider(true, true, true)` to embed fonts in the output for PDF/UA and PAC compliance.
+All HTML-to-PDF rendering uses `DefaultFontProvider(true, true, true)` to embed fonts in the output.
 
 ---
 
@@ -471,7 +360,7 @@ A React admin UI for managing publisher/journal stamping configurations.
 
 | Route | Component | Description |
 |---|---|---|
-| `/` | `ConfigTable` | Lists all configurations with archive, restore, and demo actions |
+| `/` | `ConfigTable` | Lists all configurations with archive, restore, and demo download actions |
 | `/config/new` | `ConfigForm` | Create a new publisher/journal configuration |
 | `/config/:id` | `ConfigForm` | Edit an existing configuration |
 | `/editor` | `HtmlEditorPage` | Split-pane HTML editor with live preview |
@@ -481,6 +370,17 @@ A React admin UI for managing publisher/journal stamping configurations.
 The form is tabbed across five stamp positions: New Page, Header, Footer, Left Margin, Right Margin.
 
 Each position supports: logo upload, custom HTML, plain text, metadata field toggles, date, downloaded-by, hyperlink, and ad banner.
+
+### UI features
+
+- Skeleton loading states on the config table
+- Illustrated empty state with call-to-action
+- Breadcrumb navigation on the config form
+- Sticky bottom action bar (Cancel, Preview, Sample PDF, Save)
+- Confirmation dialog for delete actions with undo toast
+- Custom tooltips on action buttons
+- Tab scroll fade indicator on narrow screens
+- ARIA labels and roles for accessibility
 
 ---
 
@@ -493,8 +393,7 @@ Each position supports: logo upload, custom HTML, plain text, metadata field tog
 │   │   ├── StampingProperties.java           # Typed config properties (@ConfigurationProperties)
 │   │   └── WebConfig.java                    # CORS configuration
 │   ├── controller/
-│   │   ├── StampController.java              # All production endpoints
-│   │   └── DevController.java                # Dev-only endpoints (profile: dev)
+│   │   └── StampController.java              # All API endpoints
 │   ├── service/
 │   │   ├── StampOrchestrationService.java    # Full stamping pipeline orchestration
 │   │   ├── StampService.java                 # Delegates to HtmlStamper
@@ -505,8 +404,8 @@ Each position supports: logo upload, custom HTML, plain text, metadata field tog
 │   │   ├── InputSanitizer.java               # File path, URL, identifier, and HTML validation
 │   │   ├── AdFetchService.java               # BAM ad API client
 │   │   ├── AdStampService.java               # Ad HTML processing and URL rewriting
-│   │   ├── DemoStampService.java             # Demo PDF generation (profile: dev)
-│   │   ├── DemoConfigGeneratorService.java   # Auto-generates test request JSON (profile: dev)
+│   │   ├── DemoStampService.java             # Demo/sample PDF generation from saved configs
+│   │   ├── DemoConfigGeneratorService.java   # Translates frontend config to stamping positions
 │   │   └── stamper/
 │   │       ├── Stamper.java                  # Strategy interface
 │   │       └── HtmlStamper.java              # HTML→PDF XObject overlay with annotation transfer
@@ -523,7 +422,7 @@ Each position supports: logo upload, custom HTML, plain text, metadata field tog
 │       └── GlobalExceptionHandler.java       # @RestControllerAdvice error handler
 ├── src/main/resources/
 │   └── application.yml                       # All runtime configuration
-├── frontend-react/                           # React admin UI (not deployed as-is)
+├── frontend-react/                           # React admin UI
 │   └── src/
 │       ├── components/                       # UI components
 │       ├── context/                          # React context (config state, template state)
@@ -562,7 +461,7 @@ npm run build
 
 Source folders (`src/`, `frontend-react/src/`, `node_modules/`, `pom.xml`) are not needed in production.
 
-### Run on Linux
+### Run
 
 ```bash
 java -jar pdf-stamping-service-1.0.0.jar
@@ -571,8 +470,7 @@ java -jar pdf-stamping-service-1.0.0.jar
 Ensure:
 - Java 17+ is installed
 - The working directory is writable (for `configs/`, `temp/`, `archive_configs/`)
-- `STAMPING_CORS_ORIGINS` is set to your frontend origin
-- `SPRING_PROFILES_ACTIVE` is set to `prod` (disables dev-only endpoints and services)
+- `STAMPING_CORS_ORIGINS` is set to your frontend origin(s)
 
 ### Nginx reverse proxy
 
@@ -598,53 +496,10 @@ server {
 
 With a reverse proxy, frontend and backend share the same origin — no CORS configuration needed on the backend.
 
----
-
-## Dev Utilities
-
-These are only active when `spring.profiles.active=dev`.
-
-### Auto-generated test request files
-
-Every time a config is saved via `POST /api/v1/configs`, the backend writes a ready-to-use `JournalMetadataRequest` JSON to `test_requests/journal_metadata_{pubId}_{jcode}.json` with placeholder metadata.
-
-### Manual trigger
-
-```
-POST /api/v1/dev/generate-test-config/{pubId}/{jcode}
-```
-
-Regenerates the test request file for an existing saved config.
-
 ### Health check
 
 ```
 GET /actuator/health
 ```
 
-### Sample curl requests
-
-```bash
-# Stamp using a local file path
-curl -X POST http://localhost:8080/api/v1/stamp/journal-metadata \
-  -H "Content-Type: application/json" \
-  -d @test_requests/journal_metadata_demoPub_demoJcode.json \
-  --output stamped.pdf
-
-# Stamp using a remote URL
-curl -X POST http://localhost:8080/api/v1/stamp/journal-metadata \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pdfUrl": "https://example.org/article.pdf",
-    "publisherId": "demoPub",
-    "jcode": "demoJcode",
-    "env": "demo"
-  }' \
-  --output stamped.pdf
-
-# Download a demo-stamped PDF
-curl http://localhost:8080/api/v1/stamp/demo-pdf/demoPub/demoJcode --output demo.pdf
-
-# List all configs
-curl http://localhost:8080/api/v1/configs
-```
+Returns service health status. Exposed via Spring Boot Actuator.
